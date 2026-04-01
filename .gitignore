@@ -1,0 +1,21 @@
+CLAUDE
+.claude
+
+# Generated instances (large, reproducible via scripts/generate.py)
+data/**/*.cnf
+!data/**/.gitkeep
+
+# Experiment outputs
+experiments/results/
+experiments/**/*.pt
+experiments/**/*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+
+# OS
+.DS_Store

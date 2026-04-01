@@ -1,0 +1,35 @@
+# Base experiment config. Copy and modify per run.
+
+family: kcoloring        # random_3sat | kcoloring
+scale: n100              # n100 | n200
+
+data_dir: data/
+
+# Evaluation budget (matches Interian & Bernardini KR 2023)
+max_flips: 10000         # 50000 for n200
+max_tries: 10
+
+# Policy
+policy: mlp              # minbreak | noveltyplus | linear | mlp
+feature_set: full        # interian | base | full | no_recency
+
+# MLP architecture
+hidden_dim: 64
+n_layers: 2
+
+# REINFORCE (offline training)
+k: 10                    # k-step return horizon; sweep [5, 10, 20, 50]
+gamma: 0.5
+baseline_momentum: 0.99
+lr: 1.0e-3
+batch_size: 1            # instances per gradient step (matches Interian)
+n_epochs: 60
+warmup_epochs: 5
+
+# Online adaptation (Mode 2; ignored if mode=offline)
+mode: offline            # offline | online
+online_lr: 1.0e-5
+online_delta: 10         # gradient step every delta flips (default: = k)
+
+# Reproducibility
+seed: 42
