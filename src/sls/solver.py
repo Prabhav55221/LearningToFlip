@@ -4,12 +4,19 @@ Policy-agnostic SLS loop.
 Runs one SLS try (up to max_flips) from a random initial assignment.
 Each step: pick random unsatisfied clause → call policy.select() → flip.
 Returns a SolveResult with the full trajectory if requested (for REINFORCE).
+
+Logging (controlled by caller via logging.setup()):
+  DEBUG -- per-try result (try index, flips, solved/timeout)
+  INFO  -- nothing here; per-instance logging is done by the caller
 """
 
+import logging
 from dataclasses import dataclass, field
 from src.sat.parser import CNFFormula
 from src.sat.state import SLSState
 from src.policy.base import Policy
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -70,8 +77,10 @@ def solve(
     Returns the first solved result, or the last failed result.
     """
     result = SolveResult(solved=False, n_flips=0)
-    for _ in range(max_tries):
+    for t in range(max_tries):
         result = run_try(formula, policy, max_flips, record_trajectory)
+        status = f"solved in {result.n_flips} flips" if result.solved else f"timeout ({max_flips} flips)"
+        log.debug("  try %d/%d: %s", t + 1, max_tries, status)
         if result.solved:
             return result
     return result
