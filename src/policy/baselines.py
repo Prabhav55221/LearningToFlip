@@ -1,22 +1,25 @@
 """
 Classical SLS baselines. No learnable parameters.
 
-Both implement the Policy protocol and can be dropped into the SLS loop
-or evaluation runner identically to the learned policies.
+Both implement the Policy protocol identically to learned policies and can be
+dropped into the SLS loop and evaluation runner without any special casing.
 """
 
-import numpy as np
+import random
 from src.sat.state import SLSState
 
 
 class MinBreak:
     """
-    WalkSAT min-break: score = -break(x).
-    Ties broken uniformly at random by the SLS loop's softmax sampling.
+    WalkSAT min-break: flip the candidate with the lowest break count.
+    Ties broken uniformly at random.
     """
 
-    def score(self, candidates: list[int], state: SLSState) -> np.ndarray:
-        return -state.break_[candidates].astype(np.float32)
+    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float]:
+        breaks = [state.break_count(v) for v in candidates]
+        min_b = min(breaks)
+        tied = [v for v, b in zip(candidates, breaks) if b == min_b]
+        return random.choice(tied), 0.0
 
     def is_learnable(self) -> bool:
         return False
@@ -24,19 +27,38 @@ class MinBreak:
 
 class NoveltyPlus:
     """
-    Novelty+: avoid the most recently flipped variable unless it is the only
-    candidate with break == 0; add random walk with probability p.
+    Novelty+: with probability p pick a uniformly random candidate (random walk).
+    Otherwise apply the Novelty rule:
+      - Among candidates with minimum break count, exclude the most recently
+        flipped variable unless it is the only min-break candidate.
+      - Pick uniformly among the remaining min-break candidates.
 
-    Novelty rule: among candidates with min break, skip the most recently
-    flipped unless all others have strictly higher break.
-    Novelty+: with probability p, instead pick a random candidate (random walk).
+    p=0.0 gives pure Novelty (no random walk).
+    Default p=0.1 matches the standard Novelty+ setting.
     """
 
     def __init__(self, p: float = 0.1) -> None:
         self.p = p
 
-    def score(self, candidates: list[int], state: SLSState) -> np.ndarray:
-        raise NotImplementedError
+    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float]:
+        # Random walk
+        if random.random() < self.p:
+            return random.choice(candidates), 0.0
+
+        # Most recently flipped candidate (smallest age = most recent flip)
+        most_recent = min(candidates, key=lambda v: state.age(v))
+
+        # Min-break candidates
+        breaks = {v: state.break_count(v) for v in candidates}
+        min_b = min(breaks.values())
+        pool = [v for v in candidates if breaks[v] == min_b]
+
+        # Novelty: exclude the most recently flipped variable from the pool
+        # unless it is the only one there
+        if len(pool) > 1 and most_recent in pool:
+            pool.remove(most_recent)
+
+        return random.choice(pool), 0.0
 
     def is_learnable(self) -> bool:
         return False

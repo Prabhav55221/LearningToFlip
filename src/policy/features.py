@@ -1,15 +1,15 @@
 """
 Feature extraction: φ(x, state) → feature vector.
 
-All 9 features are O(1) lookups from SLSState's incremental tables.
-Feature sets are defined here so ablations can be configured by name.
+All 9 features are derived from SLSState's incremental tables and on-demand
+break/make methods. Features are cached within a single call to avoid redundant
+computation when multiple features share the same underlying value.
 """
 
 import numpy as np
 from src.sat.state import SLSState
 
 
-# Ordered list of all available features.
 ALL_FEATURES = [
     "break",
     "make",
@@ -22,11 +22,10 @@ ALL_FEATURES = [
     "flip_count",
 ]
 
-# Named ablation sets (subsets of ALL_FEATURES).
 FEATURE_SETS = {
-    "interian": ["break", "is_recent_5", "is_recent_10"],
-    "base":     ["make", "break", "age", "is_recent_5", "is_recent_10"],
-    "full":     ALL_FEATURES,
+    "interian":   ["break", "is_recent_5", "is_recent_10"],
+    "base":       ["make", "break", "age", "is_recent_5", "is_recent_10"],
+    "full":       ALL_FEATURES,
     "no_recency": ["make", "break", "age", "break_zero", "unsat_deg", "deg", "flip_count"],
 }
 
@@ -36,27 +35,48 @@ def extract(var: int, state: SLSState, feature_set: str = "full") -> np.ndarray:
     Extract the feature vector for variable var in the given state.
     Returns shape (len(features),) float32 array.
     """
-    names = FEATURE_SETS[feature_set]
-    return extract_named(var, state, names)
+    return extract_named(var, state, FEATURE_SETS[feature_set])
 
 
 def extract_named(var: int, state: SLSState, names: list[str]) -> np.ndarray:
-    """Extract a specific list of features by name."""
+    """Extract a specific list of features by name. Caches break/make/age per call."""
+    # Lazy-compute values that may be needed by multiple features
+    _brk: int | None = None
+    _mk: int | None = None
+    _age: int | None = None
+
+    def brk() -> int:
+        nonlocal _brk
+        if _brk is None:
+            _brk = state.break_count(var)
+        return _brk
+
+    def mk() -> int:
+        nonlocal _mk
+        if _mk is None:
+            _mk = state.make_count(var)
+        return _mk
+
+    def age() -> int:
+        nonlocal _age
+        if _age is None:
+            _age = state.age(var)
+        return _age
+
     vec = []
-    age = state.age(var)
     for name in names:
         if name == "break":
-            vec.append(float(state.break_[var]))
+            vec.append(float(brk()))
         elif name == "make":
-            vec.append(float(state.make[var]))
+            vec.append(float(mk()))
         elif name == "age":
-            vec.append(float(age))
+            vec.append(float(age()))
         elif name == "is_recent_5":
-            vec.append(float(age <= 5))
+            vec.append(float(age() <= 5))
         elif name == "is_recent_10":
-            vec.append(float(age <= 10))
+            vec.append(float(age() <= 10))
         elif name == "break_zero":
-            vec.append(float(state.break_[var] == 0))
+            vec.append(float(brk() == 0))
         elif name == "unsat_deg":
             vec.append(float(state.unsat_deg[var]))
         elif name == "deg":
@@ -65,6 +85,7 @@ def extract_named(var: int, state: SLSState, names: list[str]) -> np.ndarray:
             vec.append(float(state.flip_count[var]))
         else:
             raise ValueError(f"Unknown feature: {name}")
+
     return np.array(vec, dtype=np.float32)
 
 

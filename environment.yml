@@ -1,0 +1,15 @@
+name: l2f
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch>=2.2.0
+  - numpy>=1.26.0
+  - pyyaml>=6.0
+  - matplotlib>=3.8.0
+  - tqdm>=4.66.0
+  - pytest>=8.0
+  - pip
+  - pip:
+      - cnfgen>=0.9.0

@@ -22,7 +22,8 @@ SLS solvers (e.g., WalkSAT) maintain a complete variable assignment and iterativ
 ## Setup
 
 ```bash
-pip install -r requirements.txt
+conda env create -f environment.yml
+conda activate l2f
 ```
 
 ## Usage

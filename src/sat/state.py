@@ -1,71 +1,148 @@
 """
 Incremental WalkSAT state.
 
-All per-variable statistics (make, break, unsat_deg, age, flip_count) are
-maintained incrementally — O(clause_width) work per flip, O(1) feature lookup.
+Maintained incrementally after each flip (O(clause_width) work per flip):
+  - n_true[c]: number of True literals in clause c
+  - _unsat: set of unsatisfied clause indices (for random clause selection)
+  - unsat_deg[v]: number of unsatisfied clauses containing variable v
 
-When variable x is flipped:
-  - Iterate over clauses containing x
-  - For each clause that changes satisfaction status, update make/break/unsat_deg
-    for all variables sharing that clause
+Computed on demand (O(degree) per variable, called only for clause candidates):
+  - make_count(v): UNSAT clauses that flipping v would satisfy
+  - break_count(v): SAT clauses that flipping v would violate (v is sole satisfier)
+
+This avoids the complexity of fully incremental make/break while staying fast
+enough at our scales (n=100-200, degree ~13 for 3-SAT at phase transition).
 """
 
 import random
 import numpy as np
-from dataclasses import dataclass, field
 from src.sat.parser import CNFFormula
 
 
-@dataclass
 class SLSState:
-    formula: CNFFormula
-    assignment: np.ndarray        # shape (n_vars,), dtype bool
-    step: int = 0
+    def __init__(self, formula: CNFFormula, assignment: np.ndarray) -> None:
+        self.formula = formula
+        self.assignment = assignment.copy().astype(bool)
+        self.step: int = 0
 
-    # Per-variable incremental statistics
-    make: np.ndarray = field(init=False)       # make[x]: unsat clauses x would satisfy
-    break_: np.ndarray = field(init=False)     # break_[x]: sat clauses x would violate
-    unsat_deg: np.ndarray = field(init=False)  # unsat_deg[x]: unsat clauses containing x
-    deg: np.ndarray = field(init=False)        # deg[x]: total clauses containing x (constant)
-    flip_count: np.ndarray = field(init=False) # flip_count[x]: total flips this episode
-    last_flip: np.ndarray = field(init=False)  # last_flip[x]: step of last flip (-1 if never)
+        n = formula.n_vars
+        m = formula.n_clauses
 
-    # Clause-level tracking
-    n_satisfied: int = field(init=False)
-    unsat_clause_indices: set = field(init=False)
+        # Precomputed: total clause degree per variable (constant)
+        self._deg = np.array([len(formula.var_clauses[v]) for v in range(n)], dtype=np.int32)
 
-    def __post_init__(self) -> None:
-        raise NotImplementedError
+        # n_true[c]: number of currently-True literals in clause c
+        self._n_true = np.zeros(m, dtype=np.int32)
+        for ci, clause in enumerate(formula.clauses):
+            self._n_true[ci] = sum(1 for (var, pol) in clause if assignment[var] == pol)
+
+        # Unsatisfied clause index set
+        self._unsat: set[int] = {ci for ci in range(m) if self._n_true[ci] == 0}
+
+        # unsat_deg[v]: number of unsatisfied clauses containing v
+        self._unsat_deg = np.zeros(n, dtype=np.int32)
+        for ci in self._unsat:
+            for (var, _) in formula.clauses[ci]:
+                self._unsat_deg[var] += 1
+
+        # Flip history
+        self._flip_count = np.zeros(n, dtype=np.int32)
+        self._last_flip = np.full(n, -1, dtype=np.int64)
 
     @classmethod
     def random_init(cls, formula: CNFFormula) -> "SLSState":
-        """Initialise with a uniformly random assignment."""
-        assignment = np.random.randint(0, 2, size=formula.n_vars, dtype=bool)
-        state = cls(formula=formula, assignment=assignment)
-        return state
+        assignment = np.random.randint(0, 2, size=formula.n_vars).astype(bool)
+        return cls(formula, assignment)
+
+    # ------------------------------------------------------------------ #
+    # On-demand feature computation (called only for ~3 candidates/step)  #
+    # ------------------------------------------------------------------ #
+
+    def make_count(self, var: int) -> int:
+        """UNSAT clauses that flipping var would satisfy."""
+        new_val = not self.assignment[var]
+        return sum(
+            1 for (ci, pol) in self.formula.var_clauses[var]
+            if ci in self._unsat and pol == new_val
+        )
+
+    def break_count(self, var: int) -> int:
+        """SAT clauses that flipping var would violate (var is their sole satisfier)."""
+        old_val = bool(self.assignment[var])
+        return sum(
+            1 for (ci, pol) in self.formula.var_clauses[var]
+            if ci not in self._unsat and pol == old_val and self._n_true[ci] == 1
+        )
+
+    def age(self, var: int) -> int:
+        """Steps since var was last flipped; returns current step if never flipped."""
+        lf = int(self._last_flip[var])
+        return self.step if lf < 0 else self.step - lf
+
+    # ------------------------------------------------------------------ #
+    # Incremental properties (O(1) lookup)                                #
+    # ------------------------------------------------------------------ #
+
+    @property
+    def deg(self) -> np.ndarray:
+        return self._deg
+
+    @property
+    def unsat_deg(self) -> np.ndarray:
+        return self._unsat_deg
+
+    @property
+    def flip_count(self) -> np.ndarray:
+        return self._flip_count
+
+    # ------------------------------------------------------------------ #
+    # Core operations                                                      #
+    # ------------------------------------------------------------------ #
 
     def flip(self, var: int) -> tuple[int, int]:
         """
-        Flip variable var. Returns (make_count, break_count) for the flip,
-        which together give the reward r_t = make - break.
-        Updates all incremental statistics.
+        Flip variable var. Returns (make_count, break_count) for this flip.
+        Updates n_true, unsat set, unsat_deg, and recency tracking.
         """
-        raise NotImplementedError
+        make_c = self.make_count(var)
+        break_c = self.break_count(var)
+
+        old_val = bool(self.assignment[var])
+        new_val = not old_val
+        self.assignment[var] = new_val
+
+        for (ci, pol) in self.formula.var_clauses[var]:
+            lit_was_true = (pol == old_val)
+            if lit_was_true:
+                # Literal True → False: clause may go SAT → UNSAT
+                self._n_true[ci] -= 1
+                if self._n_true[ci] == 0:
+                    self._unsat.add(ci)
+                    for (u, _) in self.formula.clauses[ci]:
+                        self._unsat_deg[u] += 1
+            else:
+                # Literal False → True: clause may go UNSAT → SAT
+                self._n_true[ci] += 1
+                if self._n_true[ci] == 1:
+                    self._unsat.discard(ci)
+                    for (u, _) in self.formula.clauses[ci]:
+                        self._unsat_deg[u] -= 1
+
+        self._flip_count[var] += 1
+        self._last_flip[var] = self.step
+        self.step += 1
+
+        return make_c, break_c
 
     def random_unsat_clause(self) -> list[int]:
-        """Sample a uniformly random unsatisfied clause. Returns list of variables."""
-        raise NotImplementedError
+        """Return variable indices of a uniformly random unsatisfied clause."""
+        ci = random.choice(list(self._unsat))
+        return [var for (var, _) in self.formula.clauses[ci]]
 
     @property
     def n_unsat(self) -> int:
-        return len(self.unsat_clause_indices)
+        return len(self._unsat)
 
     @property
     def is_solved(self) -> bool:
-        return self.n_unsat == 0
-
-    def age(self, var: int) -> int:
-        """Steps since var was last flipped. Returns step if never flipped."""
-        if self.last_flip[var] < 0:
-            return self.step
-        return self.step - self.last_flip[var]
+        return len(self._unsat) == 0
