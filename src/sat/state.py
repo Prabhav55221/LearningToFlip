@@ -48,6 +48,9 @@ class SLSState:
         # Flip history
         self._flip_count = np.zeros(n, dtype=np.int32)
         self._last_flip = np.full(n, -1, dtype=np.int64)
+        # Policy-flip history (age2 in Interian et al.): only updated when by_policy=True.
+        # Noise-walk flips leave this unchanged so Δ2 / last5 / last10 track policy recency.
+        self._last_policy_flip = np.full(n, -1, dtype=np.int64)
 
     @classmethod
     def random_init(cls, formula: CNFFormula) -> "SLSState":
@@ -75,8 +78,14 @@ class SLSState:
         )
 
     def age(self, var: int) -> int:
-        """Steps since var was last flipped; returns current step if never flipped."""
+        """Steps since var was last flipped (any flip); returns current step if never flipped."""
         lf = int(self._last_flip[var])
+        return self.step if lf < 0 else self.step - lf
+
+    def policy_age(self, var: int) -> int:
+        """Steps since var was last flipped by the policy (by_policy=True flips only).
+        Returns current step if the variable has never been policy-flipped."""
+        lf = int(self._last_policy_flip[var])
         return self.step if lf < 0 else self.step - lf
 
     # ------------------------------------------------------------------ #
@@ -99,7 +108,7 @@ class SLSState:
     # Core operations                                                      #
     # ------------------------------------------------------------------ #
 
-    def flip(self, var: int) -> tuple[int, int]:
+    def flip(self, var: int, by_policy: bool = True) -> tuple[int, int]:
         """
         Flip variable var. Returns (make_count, break_count) for this flip.
         Updates n_true, unsat set, unsat_deg, and recency tracking.
@@ -130,6 +139,8 @@ class SLSState:
 
         self._flip_count[var] += 1
         self._last_flip[var] = self.step
+        if by_policy:
+            self._last_policy_flip[var] = self.step
         self.step += 1
 
         return make_c, break_c

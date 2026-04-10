@@ -14,13 +14,13 @@ class TestMinBreak:
         """Selected variable must be one of the candidates."""
         candidates = all_false_state.random_unsat_clause()
         policy = MinBreak()
-        var, log_prob = policy.select(candidates, all_false_state)
+        var, log_prob, by_policy = policy.select(candidates, all_false_state)
         assert var in candidates
 
     def test_log_prob_is_zero(self, all_false_state):
         candidates = all_false_state.random_unsat_clause()
         policy = MinBreak()
-        _, log_prob = policy.select(candidates, all_false_state)
+        _, log_prob, _ = policy.select(candidates, all_false_state)
         assert log_prob == 0.0
 
     def test_selects_min_break(self, all_false_state):
@@ -30,7 +30,7 @@ class TestMinBreak:
         """
         candidates = all_false_state.random_unsat_clause()
         policy = MinBreak()
-        var, _ = policy.select(candidates, all_false_state)
+        var, *_ = policy.select(candidates, all_false_state)
         chosen_break = all_false_state.break_count(var)
         min_break = min(all_false_state.break_count(v) for v in candidates)
         assert chosen_break == min_break
@@ -41,7 +41,7 @@ class TestMinBreak:
         policy = MinBreak()
         seen = set()
         for _ in range(200):
-            var, _ = policy.select(candidates, all_false_state)
+            var, *_ = policy.select(candidates, all_false_state)
             seen.add(var)
             if seen == set(candidates):
                 break
@@ -59,13 +59,13 @@ class TestNoveltyPlus:
     def test_select_returns_valid_variable(self, all_false_state):
         candidates = all_false_state.random_unsat_clause()
         policy = NoveltyPlus(p=0.1)
-        var, _ = policy.select(candidates, all_false_state)
+        var, *_ = policy.select(candidates, all_false_state)
         assert var in candidates
 
     def test_log_prob_is_zero(self, all_false_state):
         candidates = all_false_state.random_unsat_clause()
         policy = NoveltyPlus()
-        _, log_prob = policy.select(candidates, all_false_state)
+        _, log_prob, _ = policy.select(candidates, all_false_state)
         assert log_prob == 0.0
 
     def test_random_walk_p1_always_random(self, all_false_state):
@@ -74,7 +74,7 @@ class TestNoveltyPlus:
         policy = NoveltyPlus(p=1.0)
         seen = set()
         for _ in range(300):
-            var, _ = policy.select(candidates, all_false_state)
+            var, *_ = policy.select(candidates, all_false_state)
             seen.add(var)
             if seen == set(candidates):
                 break
@@ -94,7 +94,7 @@ class TestNoveltyPlus:
             pytest.skip("Need x0 in candidates with alternatives for this test")
 
         policy = NoveltyPlus(p=0.0)  # pure Novelty, no random walk
-        chosen = {policy.select(candidates, s)[0] for _ in range(100)}
+        chosen = {policy.select(candidates, s)[0] for _ in range(100)}  # [0] = var
         # x0 (most recently flipped) should be excluded when alternatives exist
         assert 0 not in chosen
 

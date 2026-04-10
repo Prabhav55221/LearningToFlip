@@ -15,11 +15,11 @@ class MinBreak:
     Ties broken uniformly at random.
     """
 
-    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float]:
+    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float, bool]:
         breaks = [state.break_count(v) for v in candidates]
         min_b = min(breaks)
         tied = [v for v, b in zip(candidates, breaks) if b == min_b]
-        return random.choice(tied), 0.0
+        return random.choice(tied), 0.0, True
 
     def is_learnable(self) -> bool:
         return False
@@ -40,10 +40,10 @@ class NoveltyPlus:
     def __init__(self, p: float = 0.1) -> None:
         self.p = p
 
-    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float]:
+    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float, bool]:
         # Random walk
         if random.random() < self.p:
-            return random.choice(candidates), 0.0
+            return random.choice(candidates), 0.0, True
 
         # Most recently flipped candidate (smallest age = most recent flip)
         most_recent = min(candidates, key=lambda v: state.age(v))
@@ -58,7 +58,7 @@ class NoveltyPlus:
         if len(pool) > 1 and most_recent in pool:
             pool.remove(most_recent)
 
-        return random.choice(pool), 0.0
+        return random.choice(pool), 0.0, True
 
     def is_learnable(self) -> bool:
         return False

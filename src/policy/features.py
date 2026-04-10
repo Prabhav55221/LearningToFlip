@@ -1,15 +1,38 @@
 """
 Feature extraction: φ(x, state) → feature vector.
 
-All 9 features are derived from SLSState's incremental tables and on-demand
-break/make methods. Features are cached within a single call to avoid redundant
-computation when multiple features share the same underlying value.
+Two families of features:
+
+  Interian features (exact replication of Interian & Bernardini KR 2023):
+    bk_log       log(1 + min(break(x), 10))   — normalized log break
+    delta1       age(x) / t                    — any-flip recency, normalized
+    delta2       policy_age(x) / t             — policy-flip recency, normalized
+    policy_last5  1 if policy-flipped in last 5 steps
+    policy_last10 1 if policy-flipped in last 10 steps
+
+  Our extended features (9 total, used in ablation sets):
+    break, make, age, is_recent_5, is_recent_10,
+    break_zero, unsat_deg, deg, flip_count
+
+All values are cached within a single call where multiple features share
+the same underlying computation.
 """
 
+import math
 import numpy as np
 from src.sat.state import SLSState
 
 
+# --- Interian & Bernardini (KR 2023) exact feature set ---
+INTERIAN_FEATURES = [
+    "bk_log",        # log(1 + min(break, 10))
+    "delta1",        # any-flip recency normalized by step
+    "delta2",        # policy-flip recency normalized by step
+    "policy_last5",  # policy-flipped in last 5 steps
+    "policy_last10", # policy-flipped in last 10 steps
+]
+
+# --- Our extended feature set (9 features for ablation) ---
 ALL_FEATURES = [
     "break",
     "make",
@@ -23,7 +46,7 @@ ALL_FEATURES = [
 ]
 
 FEATURE_SETS = {
-    "interian":   ["break", "is_recent_5", "is_recent_10"],
+    "interian":   INTERIAN_FEATURES,
     "base":       ["make", "break", "age", "is_recent_5", "is_recent_10"],
     "full":       ALL_FEATURES,
     "no_recency": ["make", "break", "age", "break_zero", "unsat_deg", "deg", "flip_count"],
@@ -44,6 +67,7 @@ def extract_named(var: int, state: SLSState, names: list[str]) -> np.ndarray:
     _brk: int | None = None
     _mk: int | None = None
     _age: int | None = None
+    _policy_age: int | None = None
 
     def brk() -> int:
         nonlocal _brk
@@ -63,9 +87,32 @@ def extract_named(var: int, state: SLSState, names: list[str]) -> np.ndarray:
             _age = state.age(var)
         return _age
 
+    def policy_age() -> int:
+        nonlocal _policy_age
+        if _policy_age is None:
+            _policy_age = state.policy_age(var)
+        return _policy_age
+
+    t = state.step  # current step for normalization
+
     vec = []
     for name in names:
-        if name == "break":
+        # --- Interian & Bernardini (KR 2023) features ---
+        if name == "bk_log":
+            # log(1 + min(break, 10)): normalized, independent of formula size
+            vec.append(float(math.log(1 + min(brk(), 10))))
+        elif name == "delta1":
+            # Δ1 = 1 - age1/t = age(x)/t  (any-flip recency, normalized)
+            vec.append(age() / t if t > 0 else 0.0)
+        elif name == "delta2":
+            # Δ2 = 1 - age2/t = policy_age(x)/t  (policy-flip recency, normalized)
+            vec.append(policy_age() / t if t > 0 else 0.0)
+        elif name == "policy_last5":
+            vec.append(float(policy_age() <= 5))
+        elif name == "policy_last10":
+            vec.append(float(policy_age() <= 10))
+        # --- Our extended features ---
+        elif name == "break":
             vec.append(float(brk()))
         elif name == "make":
             vec.append(float(mk()))

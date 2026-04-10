@@ -16,13 +16,16 @@ from src.sat.state import SLSState
 
 @runtime_checkable
 class Policy(Protocol):
-    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float]:
+    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float, bool]:
         """
         Choose a variable from candidates to flip.
 
         Returns:
-            var:      the chosen variable (must be in candidates)
-            log_prob: log probability of the choice (0.0 for classical baselines)
+            var:       the chosen variable (must be in candidates)
+            log_prob:  log probability of the choice (0.0 for classical baselines)
+            by_policy: False when the flip is a noise/random-walk step that should
+                       NOT update age2 (policy recency). True for all classical
+                       baselines and for scored selections in learned policies.
         """
         ...
 

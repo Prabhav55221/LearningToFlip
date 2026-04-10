@@ -32,7 +32,7 @@ class MLPPolicy(nn.Module):
         layers.append(nn.Linear(in_dim, 1))
         self.net = nn.Sequential(*layers)
 
-    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float]:
+    def select(self, candidates: list[int], state: SLSState) -> tuple[int, float, bool]:
         """Inference: softmax sample, no gradient."""
         phi = extract_batch(candidates, state, self.feature_set)
         x = torch.from_numpy(phi)
@@ -41,7 +41,7 @@ class MLPPolicy(nn.Module):
         probs = torch.softmax(scores, dim=0)
         idx = int(torch.multinomial(probs, num_samples=1).item())
         log_prob = float(torch.log(probs[idx]).item())
-        return candidates[idx], log_prob
+        return candidates[idx], log_prob, True
 
     def score_tensor(self, candidates: list[int], state: SLSState) -> torch.Tensor:
         """Training: scores with gradient tracking for REINFORCE."""

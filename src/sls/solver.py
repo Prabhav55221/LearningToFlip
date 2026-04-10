@@ -52,8 +52,8 @@ def run_try(
             return SolveResult(solved=True, n_flips=state.step, trajectory=trajectory)
 
         candidates = state.random_unsat_clause()
-        var, log_prob = policy.select(candidates, state)
-        make_c, break_c = state.flip(var)
+        var, log_prob, by_policy = policy.select(candidates, state)
+        make_c, break_c = state.flip(var, by_policy=by_policy)
 
         if record_trajectory:
             trajectory.append(StepRecord(

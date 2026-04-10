@@ -13,3 +13,4 @@ dependencies:
   - pip
   - pip:
       - cnfgen>=0.9.0
+      - python-sat>=0.1.7
