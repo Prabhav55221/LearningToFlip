@@ -17,13 +17,13 @@ from src.utils.logging import setup as setup_logging
 from src.train.interian_reinforce import InterianConfig, train
 
 
-BUDGETS = {"n100": 10_000, "n200": 50_000}
+BUDGETS = {"n50": 5_000, "n100": 10_000, "n200": 50_000}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train Interian linear policy via REINFORCE")
     parser.add_argument("--family", choices=["kcoloring", "random_3sat"], required=True)
-    parser.add_argument("--scale",  choices=["n100", "n200"], required=True)
+    parser.add_argument("--scale",  choices=["n50", "n100", "n200"], required=True)
     parser.add_argument("--epochs",        type=int,   default=60)
     parser.add_argument("--warmup-epochs", type=int,   default=5)
     parser.add_argument("--gamma",         type=float, default=0.5)

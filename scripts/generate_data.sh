@@ -93,6 +93,7 @@ for split in train val test; do
         val)   N=$N_VAL ;;
         test)  N=$N_TEST ;;
     esac
+    generate kcoloring n50  "$split" "$N" kcolor 5 gnp 10 0.5
     generate kcoloring n100 "$split" "$N" kcolor 5 gnp 20 0.5
     generate kcoloring n200 "$split" "$N" kcolor 5 gnp 40 0.3
 done
@@ -104,6 +105,7 @@ for split in train val test; do
         val)   N=$N_VAL ;;
         test)  N=$N_TEST ;;
     esac
+    generate random_3sat n50  "$split" "$N" randkcnf 3 50 213
     generate random_3sat n100 "$split" "$N" randkcnf 3 100 426
     generate random_3sat n200 "$split" "$N" randkcnf 3 200 852
 done

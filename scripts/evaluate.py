@@ -40,7 +40,7 @@ from src.policy.linear import LinearPolicy
 from src.policy.mlp import MLPPolicy
 
 
-BUDGETS = {"n100": 10_000, "n200": 50_000}
+BUDGETS = {"n50": 5_000, "n100": 10_000, "n200": 50_000}
 
 log = logging.getLogger(__name__)
 
@@ -119,7 +119,7 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--family",   choices=["kcoloring", "random_3sat"], required=True)
-    parser.add_argument("--scale",    choices=["n100", "n200"],             required=True)
+    parser.add_argument("--scale",    choices=["n50", "n100", "n200"],      required=True)
     parser.add_argument(
         "--split", choices=["train", "val", "test"], default="val",
         help="Data split to evaluate on. Keep 'test' locked until final reporting.",
