@@ -48,9 +48,12 @@ class SLSState:
         # Flip history
         self._flip_count = np.zeros(n, dtype=np.int32)
         self._last_flip = np.full(n, -1, dtype=np.int64)
-        # Policy-flip history (age2 in Interian et al.): only updated when by_policy=True.
-        # Noise-walk flips leave this unchanged so Δ2 / last5 / last10 track policy recency.
+        # Policy-flip history (age2 / last_10 in Interian et al.):
+        #   _last_policy_flip: step index of last policy-flip (for delta2 feature)
+        #   _policy_flip_window: ordered list of last 10 policy-selected variables,
+        #       most recent first — mirrors Interian's `last_10` list exactly.
         self._last_policy_flip = np.full(n, -1, dtype=np.int64)
+        self._policy_flip_window: list[int] = []  # max length 10
 
     @classmethod
     def random_init(cls, formula: CNFFormula) -> "SLSState":
@@ -87,6 +90,11 @@ class SLSState:
         Returns current step if the variable has never been policy-flipped."""
         lf = int(self._last_policy_flip[var])
         return self.step if lf < 0 else self.step - lf
+
+    def in_last_k_policy(self, var: int, k: int) -> bool:
+        """True if var appears in the last k policy-selected variables.
+        Mirrors Interian's `v in self.last_10[:k]` check exactly."""
+        return var in self._policy_flip_window[:k]
 
     # ------------------------------------------------------------------ #
     # Incremental properties (O(1) lookup)                                #
@@ -141,6 +149,9 @@ class SLSState:
         self._last_flip[var] = self.step
         if by_policy:
             self._last_policy_flip[var] = self.step
+            self._policy_flip_window.insert(0, var)
+            if len(self._policy_flip_window) > 10:
+                self._policy_flip_window.pop()
         self.step += 1
 
         return make_c, break_c

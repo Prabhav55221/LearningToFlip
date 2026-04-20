@@ -4,11 +4,11 @@ Feature extraction: φ(x, state) → feature vector.
 Two families of features:
 
   Interian features (exact replication of Interian & Bernardini KR 2023):
-    bk_log       log(1 + min(break(x), 10))   — normalized log break
-    delta1       age(x) / t                    — any-flip recency, normalized
-    delta2       policy_age(x) / t             — policy-flip recency, normalized
-    policy_last5  1 if policy-flipped in last 5 steps
-    policy_last10 1 if policy-flipped in last 10 steps
+    bk_log       log(min(break(x), 5) + 1) / log(6)  — normalized to [0,1]
+    policy_last10 1 if var was among last 10 policy-selected variables
+    policy_last5  1 if var was among last 5 policy-selected variables
+    delta1        age(x) / t   — any-flip recency, normalized by step
+    delta2        policy_age(x) / t  — policy-flip recency, normalized by step
 
   Our extended features (9 total, used in ablation sets):
     break, make, age, is_recent_5, is_recent_10,
@@ -24,12 +24,13 @@ from src.sat.state import SLSState
 
 
 # --- Interian & Bernardini (KR 2023) exact feature set ---
+# Order matches their stats_per_clause: [breaks, in_last_10, in_last_5, age, age2]
 INTERIAN_FEATURES = [
-    "bk_log",        # log(1 + min(break, 10))
+    "bk_log",        # log(min(break, 5) + 1) / log(6) — normalized to [0,1]
+    "policy_last10", # 1 if var in last 10 policy-selected variables
+    "policy_last5",  # 1 if var in last 5 policy-selected variables
     "delta1",        # any-flip recency normalized by step
     "delta2",        # policy-flip recency normalized by step
-    "policy_last5",  # policy-flipped in last 5 steps
-    "policy_last10", # policy-flipped in last 10 steps
 ]
 
 # --- Our extended feature set (9 features for ablation) ---
@@ -99,18 +100,18 @@ def extract_named(var: int, state: SLSState, names: list[str]) -> np.ndarray:
     for name in names:
         # --- Interian & Bernardini (KR 2023) features ---
         if name == "bk_log":
-            # log(1 + min(break, 10)): normalized, independent of formula size
-            vec.append(float(math.log(1 + min(brk(), 10))))
+            # log(min(break, 5) + 1) / log(6): normalized to [0, 1]
+            vec.append(float(math.log(min(brk(), 5) + 1) / math.log(6)))
         elif name == "delta1":
             # Δ1 = 1 - age1/t = age(x)/t  (any-flip recency, normalized)
             vec.append(age() / t if t > 0 else 0.0)
         elif name == "delta2":
             # Δ2 = 1 - age2/t = policy_age(x)/t  (policy-flip recency, normalized)
             vec.append(policy_age() / t if t > 0 else 0.0)
-        elif name == "policy_last5":
-            vec.append(float(policy_age() <= 5))
         elif name == "policy_last10":
-            vec.append(float(policy_age() <= 10))
+            vec.append(float(state.in_last_k_policy(var, 10)))
+        elif name == "policy_last5":
+            vec.append(float(state.in_last_k_policy(var, 5)))
         # --- Our extended features ---
         elif name == "break":
             vec.append(float(brk()))
