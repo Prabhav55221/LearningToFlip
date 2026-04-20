@@ -258,12 +258,16 @@ def train(
         final_div_factor=10,
     )
 
-    best_val_median = float("inf")
-    best_state_dict: dict | None = None
-
-    # Initial validation before training starts
+    # Initial validation — warm-up state is the baseline to beat
     val_med = validate(val_formulas, policy, config)
     log.info("  Pre-training val median: %.0f flips", val_med)
+
+    best_val_median = val_med
+    best_state_dict: dict = {k: v.clone() for k, v in policy.state_dict().items()}
+    if save_dir is not None:
+        save_dir.mkdir(parents=True, exist_ok=True)
+        torch.save(best_state_dict, save_dir / "best_interian.pt")
+        log.info("  Saved warm-up model as initial best (val_median=%.0f)", best_val_median)
 
     for epoch in range(config.epochs):
         random.shuffle(train_formulas)
