@@ -3,7 +3,10 @@ REINFORCE with rolling k-step returns and EMA baseline.
 
 Key design:
   - Per-step gradient updates (not end-of-episode)
-  - Rolling deque of k (log_prob, reward) pairs; fires a gradient update when full
+  - Rolling deque of k (phi, idx, reward) entries; fires a gradient update when full
+  - Buffer stores raw numpy features + chosen index — no live computation graphs
+  - At update time, log_prob is recomputed from phi with CURRENT weights (avoids
+    stale-graph RuntimeError from in-place optimizer weight modifications)
   - EMA baseline: subtract OLD value before gradient step, then update after
   - Generic warm-up via cross-entropy against min-break (works for linear and MLP)
   - Reward: make_count - break_count (per-step, not binary like Interian)
@@ -24,6 +27,7 @@ import torch.nn as nn
 
 from src.sat.parser import CNFFormula, parse_dimacs
 from src.sat.state import SLSState
+from src.policy.features import extract_batch
 
 log = logging.getLogger(__name__)
 
@@ -44,14 +48,15 @@ class REINFORCEConfig:
 
 class KStepBuffer:
     """
-    Rolling deque of k (log_prob, reward) pairs.
+    Rolling deque of k (phi, idx, reward) tuples — no live tensors.
 
-    push() fires a gradient signal as soon as the buffer is full:
-      - Returns (lp_t, G_t) for the oldest entry when it has accumulated k rewards.
-      - Returns None while the buffer is still filling up.
-      - After returning, the oldest entry is evicted so the window slides by one.
+    Stores the pre-extracted feature matrix (numpy), the chosen action index,
+    and the scalar reward. When the buffer fires, the caller recomputes log_prob
+    from phi with CURRENT weights, avoiding stale-graph errors from in-place
+    optimizer updates between the forward pass and the backward pass.
 
-    Call reset() between episodes to discard residual entries.
+    push() returns (phi_t, idx_t, G_t) when the oldest entry has k rewards;
+    returns None while filling up. Call reset() between episodes.
     """
 
     def __init__(self, k: int, gamma: float) -> None:
@@ -59,13 +64,13 @@ class KStepBuffer:
         self.gamma = gamma
         self._buf: deque = deque(maxlen=k)
 
-    def push(self, log_prob: torch.Tensor, reward: float):
+    def push(self, phi: np.ndarray, idx: int, reward: float):
         if len(self._buf) == self.k:
-            lp_t = self._buf[0][0]
-            G_t = float(sum(self.gamma ** i * self._buf[i][1] for i in range(self.k)))
-            self._buf.append((log_prob, reward))
-            return lp_t, G_t
-        self._buf.append((log_prob, reward))
+            phi_t, idx_t, _ = self._buf[0]
+            G_t = float(sum(self.gamma ** i * self._buf[i][2] for i in range(self.k)))
+            self._buf.append((phi, idx, reward))
+            return phi_t, idx_t, G_t
+        self._buf.append((phi, idx, reward))
         return None
 
     def reset(self) -> None:
@@ -90,17 +95,25 @@ class REINFORCETrainer:
     def reset(self) -> None:
         self.buffer.reset()
 
-    def step(self, log_prob: torch.Tensor, reward: float) -> dict | None:
+    def step(self, phi: np.ndarray, idx: int, reward: float) -> dict | None:
         """
-        Push (log_prob, reward). If the buffer fires, compute k-step advantage,
-        backprop, update EMA baseline (AFTER gradient step), and return metrics.
-        Returns None if no update happened yet.
+        Push (phi, idx, reward). If the buffer fires:
+          - Recompute log_prob[idx] from stored phi with CURRENT weights
+          - Compute k-step advantage and backprop
+          - Update EMA baseline AFTER gradient step
+        Returns a metrics dict or None if no update happened.
         """
-        result = self.buffer.push(log_prob, reward)
+        result = self.buffer.push(phi, idx, reward)
         if result is None:
             return None
 
-        lp_t, G_t = result
+        phi_t, idx_t, G_t = result
+
+        # Recompute with current weights — no stale graph
+        scores = self.policy.score_phi(phi_t)
+        log_probs = torch.log_softmax(scores, dim=0)
+        lp_t = log_probs[idx_t]
+
         advantage = G_t - self._baseline   # subtract OLD baseline
         loss = -(lp_t * advantage)
 
@@ -259,14 +272,14 @@ def train(
                     break
 
                 candidates = state.random_unsat_clause()
-                scores = policy.score_logits(candidates, state)
-                log_probs = torch.log_softmax(scores, dim=0)
+                phi = extract_batch(candidates, state, policy.feature_set)
 
                 with torch.no_grad():
-                    idx = int(torch.multinomial(log_probs.detach().exp(), 1).item())
+                    scores = policy.score_phi(phi)
+                    idx = int(torch.multinomial(torch.softmax(scores, dim=0), 1).item())
 
                 make_c, break_c = state.flip(candidates[idx], by_policy=True)
-                metrics = trainer.step(log_probs[idx], float(make_c - break_c))
+                metrics = trainer.step(phi, idx, float(make_c - break_c))
 
                 if metrics is not None:
                     all_losses.append(metrics["loss"])

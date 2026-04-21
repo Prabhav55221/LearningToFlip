@@ -7,6 +7,7 @@ Small, shallow MLP (2 hidden layers, ReLU). The linear policy is a strict
 special case; this captures nonlinear feature interactions.
 """
 
+import numpy as np
 import torch
 import torch.nn as nn
 from src.sat.state import SLSState
@@ -51,6 +52,10 @@ class MLPPolicy(nn.Module):
 
     def score_logits(self, candidates: list[int], state: SLSState) -> torch.Tensor:
         return self.score_tensor(candidates, state)
+
+    def score_phi(self, phi: np.ndarray) -> torch.Tensor:
+        """Score from a pre-extracted feature matrix (k, n_features). Used by REINFORCE trainer."""
+        return self.net(torch.from_numpy(phi).float()).squeeze(-1)
 
     def is_learnable(self) -> bool:
         return True

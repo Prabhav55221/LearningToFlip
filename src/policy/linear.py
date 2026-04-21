@@ -90,5 +90,9 @@ class LinearPolicy(nn.Module):
         x = torch.from_numpy(phi).float()
         return self.linear(x).squeeze(-1)
 
+    def score_phi(self, phi: np.ndarray) -> torch.Tensor:
+        """Score from a pre-extracted feature matrix (k, n_features). Used by REINFORCE trainer."""
+        return self.linear(torch.from_numpy(phi).float()).squeeze(-1)
+
     def is_learnable(self) -> bool:
         return True
