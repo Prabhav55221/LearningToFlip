@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=18GB
 #SBATCH --partition=cpu
-#SBATCH --time=48:00:00
+#SBATCH --time=60:00:00
 #SBATCH --output=logs/slurm/ours_kcoloring_n50_%j.out
 #SBATCH --error=logs/slurm/ours_kcoloring_n50_%j.err
 
@@ -30,41 +30,6 @@ mkdir -p logs/slurm
 echo "===== Our REINFORCE | kcoloring/n50 ====="
 echo "Start: $(date)"
 TOTAL_START=$(date +%s)
-
-# ── Run 4: linear + base features ──────────────────────────────────────────
-echo ""
-echo "== Run 4: linear/base — kcoloring/n50 =="
-START=$(date +%s)
-python scripts/train.py \
-    --family kcoloring \
-    --scale n50 \
-    --policy linear \
-    --feature-set base \
-    --epochs 60 \
-    --warmup-epochs 5 \
-    --gamma 0.5 \
-    --lr 1e-3 \
-    --save-dir experiments/models \
-    --seed 42 \
-    --verbose
-END=$(date +%s)
-echo "  Training time: $((END - START))s"
-
-echo ""
-echo "-- Eval: linear/base kcoloring/n50 val --"
-START=$(date +%s)
-python scripts/evaluate.py \
-    --family kcoloring \
-    --scale n50 \
-    --split val \
-    --policies minbreak noveltyplus interian linear \
-    --feature-set base \
-    --model-path experiments/models/kcoloring/n50/linear_base/best_linear_base.pt \
-    --max-tries 10 \
-    --verbose \
-    --save-csv experiments/results/ours/kcoloring/n50_val_run4.csv
-END=$(date +%s)
-echo "  Eval time: $((END - START))s"
 
 # ── Run 5: MLP + base features ─────────────────────────────────────────────
 echo ""
@@ -133,6 +98,41 @@ python scripts/evaluate.py \
     --max-tries 10 \
     --verbose \
     --save-csv experiments/results/ours/kcoloring/n50_val_run6.csv
+END=$(date +%s)
+echo "  Eval time: $((END - START))s"
+
+# ── Run 4: linear + base features ──────────────────────────────────────────
+echo ""
+echo "== Run 4: linear/base — kcoloring/n50 =="
+START=$(date +%s)
+python scripts/train.py \
+    --family kcoloring \
+    --scale n50 \
+    --policy linear \
+    --feature-set base \
+    --epochs 60 \
+    --warmup-epochs 5 \
+    --gamma 0.5 \
+    --lr 1e-3 \
+    --save-dir experiments/models \
+    --seed 42 \
+    --verbose
+END=$(date +%s)
+echo "  Training time: $((END - START))s"
+
+echo ""
+echo "-- Eval: linear/base kcoloring/n50 val --"
+START=$(date +%s)
+python scripts/evaluate.py \
+    --family kcoloring \
+    --scale n50 \
+    --split val \
+    --policies minbreak noveltyplus interian linear \
+    --feature-set base \
+    --model-path experiments/models/kcoloring/n50/linear_base/best_linear_base.pt \
+    --max-tries 10 \
+    --verbose \
+    --save-csv experiments/results/ours/kcoloring/n50_val_run4.csv
 END=$(date +%s)
 echo "  Eval time: $((END - START))s"
 
