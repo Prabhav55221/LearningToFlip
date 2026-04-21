@@ -38,6 +38,7 @@ from src.sls.solver import solve
 from src.policy.baselines import MinBreak, NoveltyPlus
 from src.policy.linear import LinearPolicy
 from src.policy.mlp import MLPPolicy
+from src.policy.features import FEATURE_SETS
 
 
 BUDGETS = {"n50": 5_000, "n100": 10_000, "n200": 50_000}
@@ -45,7 +46,7 @@ BUDGETS = {"n50": 5_000, "n100": 10_000, "n200": 50_000}
 log = logging.getLogger(__name__)
 
 
-def load_policy(name: str, model_path: Path | None):
+def load_policy(name: str, model_path: Path | None, feature_set: str = "full"):
     """Instantiate and optionally load weights for a named policy."""
     if name == "minbreak":
         return MinBreak()
@@ -59,10 +60,18 @@ def load_policy(name: str, model_path: Path | None):
         policy.load_state_dict(state_dict)
         policy.eval()
         return policy
+    if name == "linear":
+        if model_path is None:
+            raise ValueError("--model-path is required for 'linear' policy")
+        policy = LinearPolicy(feature_set=feature_set)
+        state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+        policy.load_state_dict(state_dict)
+        policy.eval()
+        return policy
     if name == "mlp":
         if model_path is None:
             raise ValueError("--model-path is required for 'mlp' policy")
-        policy = MLPPolicy()
+        policy = MLPPolicy(feature_set=feature_set)
         state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
         policy.load_state_dict(state_dict)
         policy.eval()
@@ -126,13 +135,17 @@ def main() -> None:
     )
     parser.add_argument(
         "--policies", nargs="+",
-        choices=["minbreak", "noveltyplus", "interian", "mlp"],
+        choices=["minbreak", "noveltyplus", "interian", "linear", "mlp"],
         default=["minbreak", "noveltyplus"],
         help="Policies to evaluate.",
     )
     parser.add_argument(
         "--model-path", type=Path, default=None,
-        help="Path to trained model checkpoint (required for interian/mlp).",
+        help="Path to trained model checkpoint (required for interian/linear/mlp).",
+    )
+    parser.add_argument(
+        "--feature-set", choices=list(FEATURE_SETS.keys()), default="full",
+        help="Feature set for linear/mlp policies (ignored for interian/baselines).",
     )
     parser.add_argument(
         "--max-tries", type=int, default=10,
@@ -172,7 +185,7 @@ def main() -> None:
     all_results: dict[str, dict] = {}
     for policy_name in args.policies:
         print(f"  Running {policy_name} ...", end="", flush=True)
-        policy = load_policy(policy_name, args.model_path)
+        policy = load_policy(policy_name, args.model_path, args.feature_set)
         stats = evaluate_policy(policy, formulas, max_flips, args.max_tries)
         all_results[policy_name] = stats
         print(

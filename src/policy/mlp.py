@@ -49,5 +49,8 @@ class MLPPolicy(nn.Module):
         x = torch.from_numpy(phi)
         return self.net(x).squeeze(-1)  # shape (n_candidates,)
 
+    def score_logits(self, candidates: list[int], state: SLSState) -> torch.Tensor:
+        return self.score_tensor(candidates, state)
+
     def is_learnable(self) -> bool:
         return True

@@ -84,5 +84,11 @@ class LinearPolicy(nn.Module):
         probs_mixture = pw / k + (1.0 - pw) * probs_scoring  # (k,)
         return torch.log(probs_mixture + 1e-9)           # (k,)  — log probs with grad
 
+    def score_logits(self, candidates: list[int], state: SLSState) -> torch.Tensor:
+        """Training: raw linear scores WITH gradient. No noise/mixture. Used by our REINFORCE."""
+        phi = extract_batch(candidates, state, self.feature_set)
+        x = torch.from_numpy(phi).float()
+        return self.linear(x).squeeze(-1)
+
     def is_learnable(self) -> bool:
         return True

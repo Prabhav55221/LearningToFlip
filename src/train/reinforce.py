@@ -1,67 +1,296 @@
 """
-REINFORCE with k-step discounted returns and mean baseline.
+REINFORCE with rolling k-step returns and EMA baseline.
 
-Offline training loop:
-  - Sample a batch of instances from the training set
-  - For each instance, run one SLS try with trajectory recording
-  - Compute k-step returns from the buffered trajectory
-  - Update policy parameters via policy gradient
+Key design:
+  - Per-step gradient updates (not end-of-episode)
+  - Rolling deque of k (log_prob, reward) pairs; fires a gradient update when full
+  - EMA baseline: subtract OLD value before gradient step, then update after
+  - Generic warm-up via cross-entropy against min-break (works for linear and MLP)
+  - Reward: make_count - break_count (per-step, not binary like Interian)
 
-k-step return for flip at step t:
-    G_t = sum_{i=0}^{k-1} gamma^i * r_{t+i}
-
-Update fires at step t+k once r_t ... r_{t+k-1} are observed.
-Baseline b is an exponential moving average of recent G_t values.
+k-step return for flip at step t (fired when step t+k is observed):
+    G_t = Σ_{i=0}^{k-1} γ^i · r_{t+i}
 """
 
+import random
+import logging
+from collections import deque
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
-from dataclasses import dataclass
-from src.sls.solver import StepRecord
+
+from src.sat.parser import CNFFormula, parse_dimacs
+from src.sat.state import SLSState
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
 class REINFORCEConfig:
-    k: int = 10                 # return horizon
-    gamma: float = 0.5          # discount factor (matches Interian)
+    k: int = 10
+    gamma: float = 0.5
     baseline_momentum: float = 0.99
     lr: float = 1e-3
+    weight_decay: float = 1e-5
+    epochs: int = 60
+    warmup_epochs: int = 5
+    max_flips: int = 10_000
+    val_every: int = 5
+    max_tries_val: int = 10
 
 
 class KStepBuffer:
     """
-    Rolling buffer that computes k-step returns from a recorded trajectory.
-    Call compute() after a full episode to get (log_probs, advantages) tensors.
+    Rolling deque of k (log_prob, reward) pairs.
+
+    push() fires a gradient signal as soon as the buffer is full:
+      - Returns (lp_t, G_t) for the oldest entry when it has accumulated k rewards.
+      - Returns None while the buffer is still filling up.
+      - After returning, the oldest entry is evicted so the window slides by one.
+
+    Call reset() between episodes to discard residual entries.
     """
 
     def __init__(self, k: int, gamma: float) -> None:
         self.k = k
         self.gamma = gamma
+        self._buf: deque = deque(maxlen=k)
 
-    def compute(self, trajectory: list[StepRecord]) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Returns:
-            log_probs: shape (T-k,)
-            returns:   shape (T-k,)  — k-step discounted returns
-        """
-        raise NotImplementedError
+    def push(self, log_prob: torch.Tensor, reward: float):
+        if len(self._buf) == self.k:
+            lp_t = self._buf[0][0]
+            G_t = float(sum(self.gamma ** i * self._buf[i][1] for i in range(self.k)))
+            self._buf.append((log_prob, reward))
+            return lp_t, G_t
+        self._buf.append((log_prob, reward))
+        return None
+
+    def reset(self) -> None:
+        self._buf.clear()
 
 
 class REINFORCETrainer:
+    """
+    Manages per-step REINFORCE updates with EMA baseline.
+    Call reset() at the start of each new episode.
+    """
+
     def __init__(self, policy: nn.Module, config: REINFORCEConfig) -> None:
         self.policy = policy
         self.config = config
-        self.optimizer = torch.optim.AdamW(policy.parameters(), lr=config.lr)
+        self.optimizer = torch.optim.AdamW(
+            policy.parameters(), lr=config.lr, weight_decay=config.weight_decay
+        )
         self.buffer = KStepBuffer(config.k, config.gamma)
         self._baseline: float = 0.0
 
-    def update(self, trajectory: list[StepRecord]) -> dict:
-        """
-        Compute k-step returns, subtract baseline, compute policy gradient loss,
-        step optimizer. Returns a dict of training metrics (loss, mean return, etc.).
-        """
-        raise NotImplementedError
+    def reset(self) -> None:
+        self.buffer.reset()
 
-    def _update_baseline(self, mean_return: float) -> None:
+    def step(self, log_prob: torch.Tensor, reward: float) -> dict | None:
+        """
+        Push (log_prob, reward). If the buffer fires, compute k-step advantage,
+        backprop, update EMA baseline (AFTER gradient step), and return metrics.
+        Returns None if no update happened yet.
+        """
+        result = self.buffer.push(log_prob, reward)
+        if result is None:
+            return None
+
+        lp_t, G_t = result
+        advantage = G_t - self._baseline   # subtract OLD baseline
+        loss = -(lp_t * advantage)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        self._update_baseline(G_t)         # update AFTER gradient step
+
+        return {"loss": loss.item(), "return": G_t, "advantage": advantage}
+
+    def _update_baseline(self, G_t: float) -> None:
         m = self.config.baseline_momentum
-        self._baseline = m * self._baseline + (1 - m) * mean_return
+        self._baseline = m * self._baseline + (1.0 - m) * G_t
+
+
+def _run_warmup_episode(
+    formula: CNFFormula,
+    policy: nn.Module,
+    max_flips: int,
+) -> torch.Tensor | None:
+    """
+    Cross-entropy warm-up: run with min-break as the oracle, push policy scores
+    toward min-break selection. Works for any policy with a score_logits() method.
+    Returns mean cross-entropy loss or None if the instance was already satisfied.
+    """
+    state = SLSState.random_init(formula)
+    step_losses: list[torch.Tensor] = []
+
+    for _ in range(max_flips):
+        if state.is_solved:
+            break
+
+        candidates = state.random_unsat_clause()
+        breaks = [state.break_count(v) for v in candidates]
+        min_b = min(breaks)
+
+        scores = policy.score_logits(candidates, state)
+        log_probs = torch.log_softmax(scores, dim=0)
+
+        n_min = sum(1 for b in breaks if b == min_b)
+        target = torch.tensor(
+            [1.0 / n_min if b == min_b else 0.0 for b in breaks],
+            dtype=torch.float32,
+        )
+        step_losses.append(-torch.sum(target * log_probs))
+
+        min_vars = [v for v, b in zip(candidates, breaks) if b == min_b]
+        state.flip(random.choice(min_vars), by_policy=True)
+
+    if not step_losses:
+        return None
+    return torch.stack(step_losses).mean()
+
+
+def validate(
+    val_formulas: list[CNFFormula],
+    policy: nn.Module,
+    config: REINFORCEConfig,
+) -> float:
+    """Returns median flips over the validation set (max_flips if unsolved)."""
+    from src.sls.solver import solve
+    flip_counts = []
+    for formula in val_formulas:
+        with torch.no_grad():
+            result = solve(formula, policy, config.max_flips, config.max_tries_val)
+        flip_counts.append(result.n_flips)
+    return float(np.median(flip_counts))
+
+
+def train(
+    train_paths: list[Path],
+    val_paths: list[Path],
+    policy: nn.Module,
+    config: REINFORCEConfig,
+    save_dir: Path | None = None,
+    run_name: str = "ours",
+) -> nn.Module:
+    """
+    Train policy using REINFORCE with rolling k-step buffer.
+
+    Phase 1 (warm-up): cross-entropy against min-break oracle.
+    Phase 2 (REINFORCE): per-step gradient updates as the k-step buffer fills.
+
+    Checkpoints by validation median flips; warm-up model is the initial best.
+    Returns the best policy by validation.
+    """
+    log.info("Loading %d train + %d val formulas", len(train_paths), len(val_paths))
+    train_formulas = [parse_dimacs(p) for p in train_paths]
+    val_formulas = [parse_dimacs(p) for p in val_paths]
+
+    # ------------------------------------------------------------------ #
+    # Warm-up: cross-entropy against min-break oracle                     #
+    # ------------------------------------------------------------------ #
+    if config.warmup_epochs > 0:
+        log.info("==> Warm-up phase (%d epochs)", config.warmup_epochs)
+        warmup_opt = torch.optim.AdamW(
+            policy.parameters(),
+            lr=config.lr / 3,
+            weight_decay=config.weight_decay,
+        )
+        for epoch in range(config.warmup_epochs):
+            random.shuffle(train_formulas)
+            losses: list[float] = []
+            for formula in train_formulas:
+                warmup_opt.zero_grad()
+                loss = _run_warmup_episode(formula, policy, config.max_flips)
+                if loss is not None:
+                    loss.backward()
+                    warmup_opt.step()
+                    losses.append(loss.item())
+            log.info(
+                "  Warmup %d/%d  mean_loss=%.4f",
+                epoch + 1, config.warmup_epochs,
+                float(np.mean(losses)) if losses else 0.0,
+            )
+
+    # ------------------------------------------------------------------ #
+    # Initial validation — warm-up model is the checkpoint to beat        #
+    # ------------------------------------------------------------------ #
+    val_med = validate(val_formulas, policy, config)
+    log.info("  Pre-training val median: %.0f flips", val_med)
+    best_val_median = val_med
+    best_state_dict: dict = {k: v.clone() for k, v in policy.state_dict().items()}
+    ckpt_path: Path | None = None
+    if save_dir is not None:
+        save_dir.mkdir(parents=True, exist_ok=True)
+        ckpt_path = save_dir / f"best_{run_name}.pt"
+        torch.save(best_state_dict, ckpt_path)
+        log.info("  Saved warm-up model as initial best (val_median=%.0f)", best_val_median)
+
+    # ------------------------------------------------------------------ #
+    # REINFORCE phase: per-step rolling k-step buffer updates             #
+    # ------------------------------------------------------------------ #
+    log.info("==> REINFORCE phase (%d epochs)", config.epochs)
+    trainer = REINFORCETrainer(policy, config)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        trainer.optimizer,
+        max_lr=config.lr,
+        steps_per_epoch=1,
+        epochs=config.epochs,
+        div_factor=5,
+        final_div_factor=10,
+    )
+
+    for epoch in range(config.epochs):
+        random.shuffle(train_formulas)
+        all_losses: list[float] = []
+
+        for formula in train_formulas:
+            state = SLSState.random_init(formula)
+            trainer.reset()
+
+            for _ in range(config.max_flips):
+                if state.is_solved:
+                    break
+
+                candidates = state.random_unsat_clause()
+                scores = policy.score_logits(candidates, state)
+                log_probs = torch.log_softmax(scores, dim=0)
+
+                with torch.no_grad():
+                    idx = int(torch.multinomial(log_probs.detach().exp(), 1).item())
+
+                make_c, break_c = state.flip(candidates[idx], by_policy=True)
+                metrics = trainer.step(log_probs[idx], float(make_c - break_c))
+
+                if metrics is not None:
+                    all_losses.append(metrics["loss"])
+
+        scheduler.step()
+
+        log.info(
+            "Epoch %d/%d  mean_loss=%.4f",
+            epoch + 1, config.epochs,
+            float(np.mean(all_losses)) if all_losses else 0.0,
+        )
+
+        if (epoch + 1) % config.val_every == 0:
+            val_med = validate(val_formulas, policy, config)
+            log.info("  Val median: %.0f flips", val_med)
+
+            if val_med < best_val_median:
+                best_val_median = val_med
+                best_state_dict = {k: v.clone() for k, v in policy.state_dict().items()}
+                if ckpt_path is not None:
+                    torch.save(best_state_dict, ckpt_path)
+                    log.info("  Saved best model (val_median=%.0f)", best_val_median)
+
+    policy.load_state_dict(best_state_dict)
+    log.info("Restored best model (val_median=%.0f)", best_val_median)
+
+    return policy
