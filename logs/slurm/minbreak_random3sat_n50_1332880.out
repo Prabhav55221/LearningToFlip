@@ -1,0 +1,37 @@
+===== MinBreak | random_3sat/n50 =====
+Start: Mon Apr 20 17:50:34 EDT 2026
+
+-- random_3sat/n50 val --
+Loading 100 instances from data/random_3sat/n50/val ...
+  Running minbreak ...  median=60  solve=87.0%
+
+=== random_3sat/n50 — val split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak                  60       87.0%         781    87/100
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/minbreak/random_3sat/n50_val.csv
+  Time: 23s
+
+-- random_3sat/n50 test --
+Loading 500 instances from data/random_3sat/n50/test ...
+  Running minbreak ...  median=88  solve=82.4%
+
+=== random_3sat/n50 — test split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak                  88       82.4%        1044   412/500
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/minbreak/random_3sat/n50_test.csv
+  Time: 127s
+
+===== Done. Total time: 150s =====
+End: Mon Apr 20 17:53:04 EDT 2026

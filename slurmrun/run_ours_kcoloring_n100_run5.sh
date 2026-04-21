@@ -8,6 +8,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
+#SBATCH -A jeisner1
 #SBATCH --mem-per-cpu=18GB
 #SBATCH --partition=cpu
 #SBATCH --time=60:00:00

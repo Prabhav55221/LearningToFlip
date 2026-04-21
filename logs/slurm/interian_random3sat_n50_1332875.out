@@ -1,0 +1,123 @@
+===== Interian REINFORCE | random_3sat/n50 =====
+Start: Mon Apr 20 17:49:34 EDT 2026
+
+== Training: random_3sat/n50 ==
+17:49:36 | INFO  | Family: random_3sat/n50  |  train=1900  val=100
+17:49:36 | INFO  | Loading 1900 train + 100 val formulas
+17:49:38 | INFO  | ==> Warm-up phase (5 epochs)
+18:03:04 | INFO  |   Warmup 1/5  mean_loss=0.8364
+18:16:31 | INFO  |   Warmup 2/5  mean_loss=0.5835
+18:30:02 | INFO  |   Warmup 3/5  mean_loss=0.5366
+18:43:40 | INFO  |   Warmup 4/5  mean_loss=0.4920
+18:56:56 | INFO  |   Warmup 5/5  mean_loss=0.4820
+18:56:56 | INFO  | ==> REINFORCE phase (60 epochs)
+18:57:10 | INFO  |   Pre-training val median: 1027 flips
+18:57:10 | INFO  |   Saved warm-up model as initial best (val_median=1027)
+19:05:28 | INFO  | Epoch 1/60  solved=1757/1900  mean_loss=0.0024  pw=0.2479
+19:12:41 | INFO  | Epoch 2/60  solved=1783/1900  mean_loss=0.0027  pw=0.2276
+19:18:35 | INFO  | Epoch 3/60  solved=1818/1900  mean_loss=0.0030  pw=0.1938
+19:23:27 | INFO  | Epoch 4/60  solved=1842/1900  mean_loss=0.0033  pw=0.1563
+19:28:11 | INFO  | Epoch 5/60  solved=1855/1900  mean_loss=0.0031  pw=0.1207
+19:28:16 | INFO  |   Val median: 362 flips
+19:28:16 | INFO  |   Saved best model (val_median=362)
+19:32:24 | INFO  | Epoch 6/60  solved=1863/1900  mean_loss=0.0030  pw=0.0884
+19:36:01 | INFO  | Epoch 7/60  solved=1876/1900  mean_loss=0.0030  pw=0.0609
+19:39:19 | INFO  | Epoch 8/60  solved=1890/1900  mean_loss=0.0028  pw=0.0397
+19:42:06 | INFO  | Epoch 9/60  solved=1888/1900  mean_loss=0.0026  pw=0.0236
+19:44:32 | INFO  | Epoch 10/60  solved=1886/1900  mean_loss=0.0024  pw=0.0138
+19:44:34 | INFO  |   Val median: 169 flips
+19:44:34 | INFO  |   Saved best model (val_median=169)
+19:46:47 | INFO  | Epoch 11/60  solved=1896/1900  mean_loss=0.0024  pw=0.0087
+19:48:54 | INFO  | Epoch 12/60  solved=1893/1900  mean_loss=0.0022  pw=0.0051
+19:50:50 | INFO  | Epoch 13/60  solved=1895/1900  mean_loss=0.0022  pw=0.0033
+19:52:36 | INFO  | Epoch 14/60  solved=1894/1900  mean_loss=0.0020  pw=0.0018
+19:54:17 | INFO  | Epoch 15/60  solved=1898/1900  mean_loss=0.0020  pw=0.0010
+19:54:19 | INFO  |   Val median: 122 flips
+19:54:19 | INFO  |   Saved best model (val_median=122)
+19:55:56 | INFO  | Epoch 16/60  solved=1898/1900  mean_loss=0.0018  pw=0.0005
+19:57:38 | INFO  | Epoch 17/60  solved=1895/1900  mean_loss=0.0016  pw=0.0003
+19:59:13 | INFO  | Epoch 18/60  solved=1894/1900  mean_loss=0.0016  pw=0.0002
+20:00:45 | INFO  | Epoch 19/60  solved=1898/1900  mean_loss=0.0016  pw=0.0001
+20:02:18 | INFO  | Epoch 20/60  solved=1897/1900  mean_loss=0.0016  pw=0.0001
+20:02:20 | INFO  |   Val median: 118 flips
+20:02:20 | INFO  |   Saved best model (val_median=118)
+20:03:50 | INFO  | Epoch 21/60  solved=1898/1900  mean_loss=0.0015  pw=0.0001
+20:05:23 | INFO  | Epoch 22/60  solved=1896/1900  mean_loss=0.0014  pw=0.0001
+20:06:55 | INFO  | Epoch 23/60  solved=1896/1900  mean_loss=0.0014  pw=0.0000
+20:08:29 | INFO  | Epoch 24/60  solved=1896/1900  mean_loss=0.0014  pw=0.0000
+20:10:00 | INFO  | Epoch 25/60  solved=1897/1900  mean_loss=0.0014  pw=0.0000
+20:10:01 | INFO  |   Val median: 106 flips
+20:10:01 | INFO  |   Saved best model (val_median=106)
+20:11:29 | INFO  | Epoch 26/60  solved=1898/1900  mean_loss=0.0014  pw=0.0000
+20:12:58 | INFO  | Epoch 27/60  solved=1897/1900  mean_loss=0.0014  pw=0.0000
+20:14:26 | INFO  | Epoch 28/60  solved=1893/1900  mean_loss=0.0014  pw=0.0000
+20:15:52 | INFO  | Epoch 29/60  solved=1897/1900  mean_loss=0.0014  pw=0.0000
+20:17:22 | INFO  | Epoch 30/60  solved=1894/1900  mean_loss=0.0014  pw=0.0000
+20:17:23 | INFO  |   Val median: 91 flips
+20:17:23 | INFO  |   Saved best model (val_median=91)
+20:18:51 | INFO  | Epoch 31/60  solved=1896/1900  mean_loss=0.0013  pw=0.0000
+20:20:21 | INFO  | Epoch 32/60  solved=1896/1900  mean_loss=0.0013  pw=0.0000
+20:21:52 | INFO  | Epoch 33/60  solved=1898/1900  mean_loss=0.0012  pw=0.0000
+20:23:19 | INFO  | Epoch 34/60  solved=1895/1900  mean_loss=0.0013  pw=0.0000
+20:24:54 | INFO  | Epoch 35/60  solved=1898/1900  mean_loss=0.0013  pw=0.0000
+20:24:55 | INFO  |   Val median: 96 flips
+20:26:25 | INFO  | Epoch 36/60  solved=1892/1900  mean_loss=0.0013  pw=0.0000
+20:27:54 | INFO  | Epoch 37/60  solved=1896/1900  mean_loss=0.0014  pw=0.0000
+20:29:25 | INFO  | Epoch 38/60  solved=1896/1900  mean_loss=0.0012  pw=0.0000
+20:31:03 | INFO  | Epoch 39/60  solved=1895/1900  mean_loss=0.0013  pw=0.0000
+20:32:31 | INFO  | Epoch 40/60  solved=1894/1900  mean_loss=0.0013  pw=0.0000
+20:32:33 | INFO  |   Val median: 110 flips
+20:34:01 | INFO  | Epoch 41/60  solved=1896/1900  mean_loss=0.0013  pw=0.0000
+20:35:30 | INFO  | Epoch 42/60  solved=1896/1900  mean_loss=0.0013  pw=0.0000
+20:37:00 | INFO  | Epoch 43/60  solved=1898/1900  mean_loss=0.0013  pw=0.0000
+20:38:33 | INFO  | Epoch 44/60  solved=1894/1900  mean_loss=0.0012  pw=0.0000
+20:40:03 | INFO  | Epoch 45/60  solved=1895/1900  mean_loss=0.0012  pw=0.0000
+20:40:04 | INFO  |   Val median: 98 flips
+20:41:40 | INFO  | Epoch 46/60  solved=1894/1900  mean_loss=0.0011  pw=0.0000
+20:43:08 | INFO  | Epoch 47/60  solved=1895/1900  mean_loss=0.0012  pw=0.0000
+20:44:40 | INFO  | Epoch 48/60  solved=1894/1900  mean_loss=0.0012  pw=0.0000
+20:46:13 | INFO  | Epoch 49/60  solved=1893/1900  mean_loss=0.0012  pw=0.0000
+20:47:48 | INFO  | Epoch 50/60  solved=1891/1900  mean_loss=0.0011  pw=0.0000
+20:47:49 | INFO  |   Val median: 106 flips
+20:49:18 | INFO  | Epoch 51/60  solved=1897/1900  mean_loss=0.0013  pw=0.0000
+20:50:48 | INFO  | Epoch 52/60  solved=1895/1900  mean_loss=0.0013  pw=0.0000
+20:52:18 | INFO  | Epoch 53/60  solved=1895/1900  mean_loss=0.0012  pw=0.0000
+20:53:45 | INFO  | Epoch 54/60  solved=1893/1900  mean_loss=0.0012  pw=0.0000
+20:55:14 | INFO  | Epoch 55/60  solved=1897/1900  mean_loss=0.0012  pw=0.0000
+20:55:15 | INFO  |   Val median: 88 flips
+20:55:15 | INFO  |   Saved best model (val_median=88)
+20:56:44 | INFO  | Epoch 56/60  solved=1897/1900  mean_loss=0.0011  pw=0.0000
+20:58:20 | INFO  | Epoch 57/60  solved=1893/1900  mean_loss=0.0011  pw=0.0000
+20:59:41 | INFO  | Epoch 58/60  solved=1897/1900  mean_loss=0.0012  pw=0.0000
+21:01:15 | INFO  | Epoch 59/60  solved=1895/1900  mean_loss=0.0013  pw=0.0000
+21:02:43 | INFO  | Epoch 60/60  solved=1896/1900  mean_loss=0.0012  pw=0.0000
+21:02:45 | INFO  |   Val median: 93 flips
+21:02:45 | INFO  | Restored best model (val_median=88)
+21:02:45 | INFO  | Training complete.
+21:02:45 | INFO  |   Learned noise prob p_w = 0.0000
+21:02:45 | INFO  |   Scoring weights:  [[-17.83327293395996, -1.3290841579437256, -3.0052649974823, 1.0589803457260132, 0.612541675567627]]
+21:02:45 | INFO  |   Bias:             -0.0964
+  Training time: 11591s
+
+-- Eval: random_3sat/n50 val --
+Loading 100 instances from data/random_3sat/n50/val ...
+  Running minbreak ...  median=60  solve=87.0%
+  Running noveltyplus ...  median=245  solve=100.0%
+  Running interian ...  median=93  solve=100.0%
+
+=== random_3sat/n50 — val split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak                  60       87.0%         781    87/100
+noveltyplus              245      100.0%         561   100/100
+interian                  93      100.0%         149   100/100
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/interian/random_3sat/n50_val.csv
+  Eval time: 27s
+
+===== Done. Total time: 11618s =====
+End: Mon Apr 20 21:03:12 EDT 2026

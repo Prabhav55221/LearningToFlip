@@ -7,6 +7,7 @@
 #SBATCH --job-name=OUR_KCOL_50
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH -A jeisner1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=18GB
 #SBATCH --partition=cpu

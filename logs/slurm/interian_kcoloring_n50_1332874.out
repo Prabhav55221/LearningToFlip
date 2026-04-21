@@ -1,0 +1,120 @@
+===== Interian REINFORCE | kcoloring/n50 =====
+Start: Mon Apr 20 17:49:34 EDT 2026
+
+== Training: kcoloring/n50 ==
+17:49:36 | INFO  | Family: kcoloring/n50  |  train=1900  val=100
+17:49:36 | INFO  | Loading 1900 train + 100 val formulas
+17:49:38 | INFO  | ==> Warm-up phase (5 epochs)
+17:49:45 | INFO  |   Warmup 1/5  mean_loss=0.8373
+17:49:50 | INFO  |   Warmup 2/5  mean_loss=0.7999
+17:49:56 | INFO  |   Warmup 3/5  mean_loss=0.7653
+17:50:02 | INFO  |   Warmup 4/5  mean_loss=0.7368
+17:50:08 | INFO  |   Warmup 5/5  mean_loss=0.7160
+17:50:08 | INFO  | ==> REINFORCE phase (60 epochs)
+17:50:08 | INFO  |   Pre-training val median: 28 flips
+17:50:08 | INFO  |   Saved warm-up model as initial best (val_median=28)
+17:50:22 | INFO  | Epoch 1/60  solved=1900/1900  mean_loss=0.0342  pw=0.2078
+17:50:35 | INFO  | Epoch 2/60  solved=1900/1900  mean_loss=0.0326  pw=0.1677
+17:50:47 | INFO  | Epoch 3/60  solved=1900/1900  mean_loss=0.0322  pw=0.1305
+17:50:59 | INFO  | Epoch 4/60  solved=1900/1900  mean_loss=0.0309  pw=0.0966
+17:51:11 | INFO  | Epoch 5/60  solved=1900/1900  mean_loss=0.0300  pw=0.0674
+17:51:11 | INFO  |   Val median: 25 flips
+17:51:11 | INFO  |   Saved best model (val_median=25)
+17:51:22 | INFO  | Epoch 6/60  solved=1900/1900  mean_loss=0.0285  pw=0.0445
+17:51:32 | INFO  | Epoch 7/60  solved=1900/1900  mean_loss=0.0275  pw=0.0277
+17:51:43 | INFO  | Epoch 8/60  solved=1900/1900  mean_loss=0.0256  pw=0.0163
+17:51:53 | INFO  | Epoch 9/60  solved=1900/1900  mean_loss=0.0247  pw=0.0091
+17:52:03 | INFO  | Epoch 10/60  solved=1900/1900  mean_loss=0.0240  pw=0.0050
+17:52:03 | INFO  |   Val median: 22 flips
+17:52:03 | INFO  |   Saved best model (val_median=22)
+17:52:13 | INFO  | Epoch 11/60  solved=1900/1900  mean_loss=0.0235  pw=0.0026
+17:52:23 | INFO  | Epoch 12/60  solved=1900/1900  mean_loss=0.0223  pw=0.0013
+17:52:33 | INFO  | Epoch 13/60  solved=1900/1900  mean_loss=0.0215  pw=0.0007
+17:52:43 | INFO  | Epoch 14/60  solved=1900/1900  mean_loss=0.0216  pw=0.0005
+17:52:52 | INFO  | Epoch 15/60  solved=1900/1900  mean_loss=0.0211  pw=0.0003
+17:52:53 | INFO  |   Val median: 22 flips
+17:53:02 | INFO  | Epoch 16/60  solved=1900/1900  mean_loss=0.0203  pw=0.0002
+17:53:12 | INFO  | Epoch 17/60  solved=1900/1900  mean_loss=0.0209  pw=0.0002
+17:53:22 | INFO  | Epoch 18/60  solved=1900/1900  mean_loss=0.0199  pw=0.0001
+17:53:31 | INFO  | Epoch 19/60  solved=1900/1900  mean_loss=0.0202  pw=0.0000
+17:53:41 | INFO  | Epoch 20/60  solved=1900/1900  mean_loss=0.0201  pw=0.0000
+17:53:41 | INFO  |   Val median: 22 flips
+17:53:51 | INFO  | Epoch 21/60  solved=1900/1900  mean_loss=0.0201  pw=0.0000
+17:54:00 | INFO  | Epoch 22/60  solved=1900/1900  mean_loss=0.0200  pw=0.0000
+17:54:10 | INFO  | Epoch 23/60  solved=1900/1900  mean_loss=0.0194  pw=0.0000
+17:54:20 | INFO  | Epoch 24/60  solved=1900/1900  mean_loss=0.0194  pw=0.0000
+17:54:29 | INFO  | Epoch 25/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+17:54:30 | INFO  |   Val median: 21 flips
+17:54:30 | INFO  |   Saved best model (val_median=21)
+17:54:39 | INFO  | Epoch 26/60  solved=1900/1900  mean_loss=0.0194  pw=0.0000
+17:54:49 | INFO  | Epoch 27/60  solved=1900/1900  mean_loss=0.0199  pw=0.0000
+17:54:58 | INFO  | Epoch 28/60  solved=1900/1900  mean_loss=0.0194  pw=0.0000
+17:55:08 | INFO  | Epoch 29/60  solved=1900/1900  mean_loss=0.0195  pw=0.0000
+17:55:17 | INFO  | Epoch 30/60  solved=1900/1900  mean_loss=0.0198  pw=0.0000
+17:55:17 | INFO  |   Val median: 21 flips
+17:55:27 | INFO  | Epoch 31/60  solved=1900/1900  mean_loss=0.0191  pw=0.0000
+17:55:37 | INFO  | Epoch 32/60  solved=1900/1900  mean_loss=0.0192  pw=0.0000
+17:55:46 | INFO  | Epoch 33/60  solved=1900/1900  mean_loss=0.0190  pw=0.0000
+17:55:56 | INFO  | Epoch 34/60  solved=1900/1900  mean_loss=0.0194  pw=0.0000
+17:56:05 | INFO  | Epoch 35/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+17:56:05 | INFO  |   Val median: 21 flips
+17:56:15 | INFO  | Epoch 36/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+17:56:24 | INFO  | Epoch 37/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+17:56:34 | INFO  | Epoch 38/60  solved=1900/1900  mean_loss=0.0185  pw=0.0000
+17:56:43 | INFO  | Epoch 39/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+17:56:53 | INFO  | Epoch 40/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+17:56:53 | INFO  |   Val median: 21 flips
+17:57:03 | INFO  | Epoch 41/60  solved=1900/1900  mean_loss=0.0185  pw=0.0000
+17:57:13 | INFO  | Epoch 42/60  solved=1900/1900  mean_loss=0.0192  pw=0.0000
+17:57:22 | INFO  | Epoch 43/60  solved=1900/1900  mean_loss=0.0191  pw=0.0000
+17:57:32 | INFO  | Epoch 44/60  solved=1900/1900  mean_loss=0.0188  pw=0.0000
+17:57:41 | INFO  | Epoch 45/60  solved=1900/1900  mean_loss=0.0188  pw=0.0000
+17:57:41 | INFO  |   Val median: 21 flips
+17:57:51 | INFO  | Epoch 46/60  solved=1900/1900  mean_loss=0.0191  pw=0.0000
+17:58:00 | INFO  | Epoch 47/60  solved=1900/1900  mean_loss=0.0186  pw=0.0000
+17:58:10 | INFO  | Epoch 48/60  solved=1900/1900  mean_loss=0.0190  pw=0.0000
+17:58:19 | INFO  | Epoch 49/60  solved=1900/1900  mean_loss=0.0183  pw=0.0000
+17:58:29 | INFO  | Epoch 50/60  solved=1900/1900  mean_loss=0.0188  pw=0.0000
+17:58:29 | INFO  |   Val median: 21 flips
+17:58:38 | INFO  | Epoch 51/60  solved=1900/1900  mean_loss=0.0192  pw=0.0000
+17:58:48 | INFO  | Epoch 52/60  solved=1900/1900  mean_loss=0.0190  pw=0.0000
+17:58:57 | INFO  | Epoch 53/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+17:59:06 | INFO  | Epoch 54/60  solved=1900/1900  mean_loss=0.0194  pw=0.0000
+17:59:16 | INFO  | Epoch 55/60  solved=1900/1900  mean_loss=0.0190  pw=0.0000
+17:59:16 | INFO  |   Val median: 20 flips
+17:59:16 | INFO  |   Saved best model (val_median=20)
+17:59:25 | INFO  | Epoch 56/60  solved=1900/1900  mean_loss=0.0188  pw=0.0000
+17:59:35 | INFO  | Epoch 57/60  solved=1900/1900  mean_loss=0.0187  pw=0.0000
+17:59:44 | INFO  | Epoch 58/60  solved=1900/1900  mean_loss=0.0186  pw=0.0000
+17:59:53 | INFO  | Epoch 59/60  solved=1900/1900  mean_loss=0.0193  pw=0.0000
+18:00:03 | INFO  | Epoch 60/60  solved=1900/1900  mean_loss=0.0184  pw=0.0000
+18:00:03 | INFO  |   Val median: 22 flips
+18:00:03 | INFO  | Restored best model (val_median=20)
+18:00:03 | INFO  | Training complete.
+18:00:03 | INFO  |   Learned noise prob p_w = 0.0000
+18:00:03 | INFO  |   Scoring weights:  [[-21.925283432006836, -0.23791450262069702, -2.2716407775878906, 1.530251145362854, 1.0141881704330444]]
+18:00:03 | INFO  |   Bias:             -0.0376
+  Training time: 629s
+
+-- Eval: kcoloring/n50 val --
+Loading 100 instances from data/kcoloring/n50/val ...
+  Running minbreak ...  median=21  solve=100.0%
+  Running noveltyplus ...  median=22  solve=100.0%
+  Running interian ...  median=21  solve=100.0%
+
+=== kcoloring/n50 — val split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak                  21      100.0%          26   100/100
+noveltyplus               22      100.0%          23   100/100
+interian                  21      100.0%          23   100/100
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/interian/kcoloring/n50_val.csv
+  Eval time: 3s
+
+===== Done. Total time: 632s =====
+End: Mon Apr 20 18:00:06 EDT 2026

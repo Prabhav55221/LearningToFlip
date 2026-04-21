@@ -1,0 +1,37 @@
+===== MinBreak | kcoloring/n50 =====
+Start: Mon Apr 20 17:49:54 EDT 2026
+
+-- kcoloring/n50 val --
+Loading 100 instances from data/kcoloring/n50/val ...
+  Running minbreak ...  median=21  solve=100.0%
+
+=== kcoloring/n50 — val split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak                  21      100.0%          26   100/100
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/minbreak/kcoloring/n50_val.csv
+  Time: 3s
+
+-- kcoloring/n50 test --
+Loading 500 instances from data/kcoloring/n50/test ...
+  Running minbreak ...  median=22  solve=100.0%
+
+=== kcoloring/n50 — test split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak                  22      100.0%          23   500/500
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/minbreak/kcoloring/n50_test.csv
+  Time: 2s
+
+===== Done. Total time: 5s =====
+End: Mon Apr 20 17:49:59 EDT 2026

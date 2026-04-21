@@ -1,0 +1,37 @@
+===== NoveltyPlus (p=0.1) | random_3sat/n50 =====
+Start: Mon Apr 20 17:49:54 EDT 2026
+
+-- random_3sat/n50 val --
+Loading 100 instances from data/random_3sat/n50/val ...
+  Running noveltyplus ...  median=212  solve=100.0%
+
+=== random_3sat/n50 — val split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+noveltyplus              212      100.0%         608   100/100
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/noveltyplus/random_3sat/n50_val.csv
+  Time: 4s
+
+-- random_3sat/n50 test --
+Loading 500 instances from data/random_3sat/n50/test ...
+  Running noveltyplus ...  median=256  solve=99.6%
+
+=== random_3sat/n50 — test split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+noveltyplus              256       99.6%         765   498/500
+--------------------------------------------------------------
+  budget: 5,000 flips per try · unsolved → counted as 5,000
+
+Results saved to experiments/results/noveltyplus/random_3sat/n50_test.csv
+  Time: 14s
+
+===== Done. Total time: 18s =====
+End: Mon Apr 20 17:50:12 EDT 2026

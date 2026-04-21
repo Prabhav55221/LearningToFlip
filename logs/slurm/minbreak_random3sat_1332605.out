@@ -1,0 +1,69 @@
+===== MinBreak | random_3sat =====
+Start: Mon Apr 20 14:48:52 EDT 2026
+
+-- random_3sat/n100 val --
+Loading 100 instances from data/random_3sat/n100/val ...
+  Running minbreak ...  median=10000  solve=37.0%
+
+=== random_3sat/n100 — val split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak               10000       37.0%        6586    37/100
+--------------------------------------------------------------
+  budget: 10,000 flips per try · unsolved → counted as 10,000
+
+Results saved to experiments/results/minbreak/random_3sat/n100_val.csv
+  Time: 107s
+
+-- random_3sat/n100 test --
+Loading 500 instances from data/random_3sat/n100/test ...
+  Running minbreak ...  median=10000  solve=32.0%
+
+=== random_3sat/n100 — test split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak               10000       32.0%        6966   160/500
+--------------------------------------------------------------
+  budget: 10,000 flips per try · unsolved → counted as 10,000
+
+Results saved to experiments/results/minbreak/random_3sat/n100_test.csv
+  Time: 533s
+
+-- random_3sat/n200 val --
+Loading 100 instances from data/random_3sat/n200/val ...
+  Running minbreak ...  median=50000  solve=2.0%
+
+=== random_3sat/n200 — val split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak               50000        2.0%       49295     2/100
+--------------------------------------------------------------
+  budget: 50,000 flips per try · unsolved → counted as 50,000
+
+Results saved to experiments/results/minbreak/random_3sat/n200_val.csv
+  Time: 694s
+
+-- random_3sat/n200 test --
+Loading 500 instances from data/random_3sat/n200/test ...
+  Running minbreak ...  median=50000  solve=4.2%
+
+=== random_3sat/n200 — test split ===
+
+--------------------------------------------------------------
+Policy          Median Flips  Solve Rate  Mean Flips    Solved
+--------------------------------------------------------------
+minbreak               50000        4.2%       48029    21/500
+--------------------------------------------------------------
+  budget: 50,000 flips per try · unsolved → counted as 50,000
+
+Results saved to experiments/results/minbreak/random_3sat/n200_test.csv
+  Time: 3513s
+
+===== Done. Total time: 4847s =====
+End: Mon Apr 20 16:09:39 EDT 2026

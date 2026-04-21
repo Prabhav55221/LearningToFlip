@@ -9,6 +9,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=18GB
+#SBATCH -A jeisner1
 #SBATCH --partition=cpu
 #SBATCH --time=60:00:00
 #SBATCH --output=logs/slurm/ours_kcoloring_n100_run6_%j.out
