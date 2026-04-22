@@ -39,6 +39,7 @@ class REINFORCEConfig:
     baseline_momentum: float = 0.99
     lr: float = 1e-3
     weight_decay: float = 1e-5
+    entropy_coef: float = 0.0
     epochs: int = 60
     warmup_epochs: int = 5
     max_flips: int = 10_000
@@ -115,7 +116,8 @@ class REINFORCETrainer:
         lp_t = log_probs[idx_t]
 
         advantage = G_t - self._baseline   # subtract OLD baseline
-        loss = -(lp_t * advantage)
+        entropy = -torch.sum(torch.exp(log_probs) * log_probs)
+        loss = -(lp_t * advantage) - self.config.entropy_coef * entropy
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -123,7 +125,7 @@ class REINFORCETrainer:
 
         self._update_baseline(G_t)         # update AFTER gradient step
 
-        return {"loss": loss.item(), "return": G_t, "advantage": advantage}
+        return {"loss": loss.item(), "return": G_t, "advantage": advantage, "entropy": entropy.item()}
 
     def _update_baseline(self, G_t: float) -> None:
         m = self.config.baseline_momentum
@@ -264,6 +266,7 @@ def train(
     for epoch in range(config.epochs):
         random.shuffle(train_formulas)
         all_losses: list[float] = []
+        all_entropies: list[float] = []
 
         for formula in train_formulas:
             state = SLSState.random_init(formula)
@@ -285,18 +288,21 @@ def train(
 
                 if metrics is not None:
                     all_losses.append(metrics["loss"])
+                    all_entropies.append(metrics["entropy"])
 
         scheduler.step()
 
         mean_loss = float(np.mean(all_losses)) if all_losses else 0.0
-        log.info("Epoch %d/%d  mean_loss=%.4f", epoch + 1, config.epochs, mean_loss)
+        mean_entropy = float(np.mean(all_entropies)) if all_entropies else 0.0
+        log.info("Epoch %d/%d  mean_loss=%.4f  mean_entropy=%.4f", epoch + 1, config.epochs, mean_loss, mean_entropy)
         if log_fn:
             log_fn({
-                "train/epoch":     epoch + 1,
-                "train/mean_loss": mean_loss,
-                "train/n_updates": len(all_losses),
-                "train/baseline":  trainer._baseline,
-                "train/lr":        scheduler.get_last_lr()[0],
+                "train/epoch":        epoch + 1,
+                "train/mean_loss":    mean_loss,
+                "train/mean_entropy": mean_entropy,
+                "train/n_updates":    len(all_losses),
+                "train/baseline":     trainer._baseline,
+                "train/lr":           scheduler.get_last_lr()[0],
             }, step=epoch + 1)
 
         if (epoch + 1) % config.val_every == 0:

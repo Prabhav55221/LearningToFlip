@@ -49,6 +49,7 @@ def main() -> None:
     parser.add_argument("--warmup-epochs", type=int,   default=5)
     parser.add_argument("--save-dir",      type=Path,  default=Path("experiments/models"))
     parser.add_argument("--seed",          type=int,   default=42)
+    parser.add_argument("--entropy-coef",  type=float, default=0.0, help="Entropy regularization coefficient (0=disabled).")
     parser.add_argument("--verbose",       action="store_true")
     parser.add_argument("--wandb",         action="store_true", help="Enable Weights & Biases logging.")
     args = parser.parse_args()
@@ -59,6 +60,8 @@ def main() -> None:
     torch.manual_seed(args.seed)
 
     run_name = f"{args.policy}_{args.feature_set}"
+    if args.entropy_coef > 0:
+        run_name += "_e"
 
     log_fn = None
     if args.wandb:
@@ -75,11 +78,13 @@ def main() -> None:
                 "k": args.k,
                 "gamma": args.gamma,
                 "lr": args.lr,
+                "entropy_coef": args.entropy_coef,
                 "epochs": args.epochs,
                 "warmup_epochs": args.warmup_epochs,
                 "seed": args.seed,
             },
-            tags=["ours", args.policy, args.feature_set, args.family, args.scale],
+            tags=["ours", args.policy, args.feature_set, args.family, args.scale,
+                  *( ["entropy"] if args.entropy_coef > 0 else [])],
         )
         log_fn = wandb.log
 
@@ -104,6 +109,7 @@ def main() -> None:
         k=args.k,
         gamma=args.gamma,
         lr=args.lr,
+        entropy_coef=args.entropy_coef,
         epochs=args.epochs,
         warmup_epochs=args.warmup_epochs,
         max_flips=BUDGETS[args.scale],
