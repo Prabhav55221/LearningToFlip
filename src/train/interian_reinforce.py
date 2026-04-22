@@ -192,6 +192,7 @@ def train(
     val_paths: list[Path],
     config: InterianConfig,
     save_dir: Path | None = None,
+    log_fn=None,  # callable(dict) | None — e.g. wandb.log
 ) -> LinearPolicy:
     """
     Train a LinearPolicy using Interian's REINFORCE procedure.
@@ -229,11 +230,10 @@ def train(
                 loss.backward()
                 warmup_opt.step()
                 losses.append(loss.item())
-        log.info(
-            "  Warmup %d/%d  mean_loss=%.4f",
-            epoch + 1, config.warmup_epochs,
-            float(np.mean(losses)) if losses else 0.0,
-        )
+        warmup_loss = float(np.mean(losses)) if losses else 0.0
+        log.info("  Warmup %d/%d  mean_loss=%.4f", epoch + 1, config.warmup_epochs, warmup_loss)
+        if log_fn:
+            log_fn({"warmup/mean_loss": warmup_loss}, step=epoch + 1)
 
     # ------------------------------------------------------------------ #
     # REINFORCE phase                                                      #
@@ -261,6 +261,8 @@ def train(
     # Initial validation — warm-up state is the baseline to beat
     val_med = validate(val_formulas, policy, config)
     log.info("  Pre-training val median: %.0f flips", val_med)
+    if log_fn:
+        log_fn({"val/median_flips": val_med}, step=0)
 
     best_val_median = val_med
     best_state_dict: dict = {k: v.clone() for k, v in policy.state_dict().items()}
@@ -286,18 +288,25 @@ def train(
         scheduler.step()   # one scheduler step per epoch (OneCycleLR)
 
         pw = policy.noise_prob
+        mean_loss = float(np.mean(rl_losses)) if rl_losses else 0.0
         log.info(
             "Epoch %d/%d  solved=%d/%d  mean_loss=%.4f  pw=%.4f",
-            epoch + 1, config.epochs,
-            solved_count, len(train_formulas),
-            float(np.mean(rl_losses)) if rl_losses else 0.0,
-            pw,
+            epoch + 1, config.epochs, solved_count, len(train_formulas), mean_loss, pw,
         )
+        if log_fn:
+            log_fn({
+                "train/epoch":       epoch + 1,
+                "train/mean_loss":   mean_loss,
+                "train/solved_rate": solved_count / len(train_formulas),
+                "train/noise_prob":  pw,
+                "train/lr":          scheduler.get_last_lr()[0],
+            }, step=epoch + 1)
 
-        # Validation
         if (epoch + 1) % config.val_every == 0:
             val_med = validate(val_formulas, policy, config)
             log.info("  Val median: %.0f flips", val_med)
+            if log_fn:
+                log_fn({"val/median_flips": val_med}, step=epoch + 1)
 
             if val_med < best_val_median:
                 best_val_median = val_med

@@ -41,7 +41,12 @@ from src.policy.mlp import MLPPolicy
 from src.policy.features import FEATURE_SETS
 
 
-BUDGETS = {"n50": 5_000, "n100": 10_000, "n200": 50_000}
+BUDGETS = {
+    "n5":   500,   "n7":   700,   "n9":   900,
+    "n10": 1_000,  "n12": 1_200,  "n15": 1_500,  "n20": 2_000,
+    "n40": 4_000,  "n50": 5_000,  "n60": 6_000,  "n70": 7_000,
+    "n75": 7_500,  "n100": 10_000, "n200": 20_000, "n300": 30_000,
+}
 
 log = logging.getLogger(__name__)
 
@@ -127,8 +132,8 @@ def main() -> None:
         description="Evaluate SLS policies on SAT instances",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--family",   choices=["kcoloring", "random_3sat"], required=True)
-    parser.add_argument("--scale",    choices=["n50", "n100", "n200"],      required=True)
+    parser.add_argument("--family",   choices=["kcoloring", "random_3sat", "kclique", "domset"], required=True)
+    parser.add_argument("--scale",    choices=list(BUDGETS.keys()),         required=True)
     parser.add_argument(
         "--split", choices=["train", "val", "test"], default="val",
         help="Data split to evaluate on. Keep 'test' locked until final reporting.",

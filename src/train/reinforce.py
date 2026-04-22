@@ -191,6 +191,7 @@ def train(
     config: REINFORCEConfig,
     save_dir: Path | None = None,
     run_name: str = "ours",
+    log_fn=None,  # callable(dict) | None — e.g. wandb.log
 ) -> nn.Module:
     """
     Train policy using REINFORCE with rolling k-step buffer.
@@ -225,17 +226,18 @@ def train(
                     loss.backward()
                     warmup_opt.step()
                     losses.append(loss.item())
-            log.info(
-                "  Warmup %d/%d  mean_loss=%.4f",
-                epoch + 1, config.warmup_epochs,
-                float(np.mean(losses)) if losses else 0.0,
-            )
+            warmup_loss = float(np.mean(losses)) if losses else 0.0
+            log.info("  Warmup %d/%d  mean_loss=%.4f", epoch + 1, config.warmup_epochs, warmup_loss)
+            if log_fn:
+                log_fn({"warmup/mean_loss": warmup_loss}, step=epoch + 1)
 
     # ------------------------------------------------------------------ #
     # Initial validation — warm-up model is the checkpoint to beat        #
     # ------------------------------------------------------------------ #
     val_med = validate(val_formulas, policy, config)
     log.info("  Pre-training val median: %.0f flips", val_med)
+    if log_fn:
+        log_fn({"val/median_flips": val_med}, step=0)
     best_val_median = val_med
     best_state_dict: dict = {k: v.clone() for k, v in policy.state_dict().items()}
     ckpt_path: Path | None = None
@@ -286,15 +288,22 @@ def train(
 
         scheduler.step()
 
-        log.info(
-            "Epoch %d/%d  mean_loss=%.4f",
-            epoch + 1, config.epochs,
-            float(np.mean(all_losses)) if all_losses else 0.0,
-        )
+        mean_loss = float(np.mean(all_losses)) if all_losses else 0.0
+        log.info("Epoch %d/%d  mean_loss=%.4f", epoch + 1, config.epochs, mean_loss)
+        if log_fn:
+            log_fn({
+                "train/epoch":     epoch + 1,
+                "train/mean_loss": mean_loss,
+                "train/n_updates": len(all_losses),
+                "train/baseline":  trainer._baseline,
+                "train/lr":        scheduler.get_last_lr()[0],
+            }, step=epoch + 1)
 
         if (epoch + 1) % config.val_every == 0:
             val_med = validate(val_formulas, policy, config)
             log.info("  Val median: %.0f flips", val_med)
+            if log_fn:
+                log_fn({"val/median_flips": val_med}, step=epoch + 1)
 
             if val_med < best_val_median:
                 best_val_median = val_med

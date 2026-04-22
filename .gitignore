@@ -2,13 +2,13 @@ CLAUDE
 .claude
 
 # Generated instances (large, reproducible via scripts/generate.py)
-data/**/*.cnf
 !data/**/.gitkeep
 
 # Experiment outputs
 experiments/results/
 experiments/**/*.pt
 experiments/**/*.log
+scripts/generate_data_temp.sh
 
 # Python
 __pycache__/
