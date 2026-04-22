@@ -1,9 +1,0 @@
-===== Interian REINFORCE | random_3sat/n200 =====
-Start: Mon Apr 20 15:21:13 EDT 2026
-
-== Training: random_3sat/n200 ==
-15:21:15 | INFO  | Family: random_3sat/n200  |  train=1900  val=100
-15:21:15 | INFO  | Loading 1900 train + 100 val formulas
-15:21:21 | INFO  | ==> Warm-up phase (5 epochs)
-18:46:00 | INFO  |   Warmup 1/5  mean_loss=0.7558
-22:03:22 | INFO  |   Warmup 2/5  mean_loss=0.4403

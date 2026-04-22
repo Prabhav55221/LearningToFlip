@@ -1,0 +1,4 @@
+policy,median_flips,mean_flips,solve_rate,n_solved,n_instances
+minbreak,123.0,179.36,100.0,100,100
+noveltyplus,123.5,190.74,100.0,100,100
+interian,95.5,143.13,100.0,100,100

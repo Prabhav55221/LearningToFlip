@@ -1,9 +1,0 @@
-===== Interian REINFORCE | kcoloring/n200 =====
-Start: Mon Apr 20 15:21:14 EDT 2026
-
-== Training: kcoloring/n200 ==
-15:21:16 | INFO  | Family: kcoloring/n200  |  train=1900  val=100
-15:21:16 | INFO  | Loading 1900 train + 100 val formulas
-15:21:26 | INFO  | ==> Warm-up phase (5 epochs)
-18:38:59 | INFO  |   Warmup 1/5  mean_loss=0.9117
-21:48:45 | INFO  |   Warmup 2/5  mean_loss=0.6775

@@ -5,8 +5,6 @@ CLAUDE
 !data/**/.gitkeep
 
 # Experiment outputs
-experiments/results/
-experiments/**/*.pt
 experiments/**/*.log
 scripts/generate_data_temp.sh
 
@@ -22,3 +20,5 @@ logs/*
 
 # OS
 .DS_Store
+wandb
+*.log
