@@ -15,6 +15,7 @@ k-step return for flip at step t (fired when step t+k is observed):
     G_t = Σ_{i=0}^{k-1} γ^i · r_{t+i}
 """
 
+import math
 import random
 import logging
 from collections import deque
@@ -40,6 +41,7 @@ class REINFORCEConfig:
     lr: float = 1e-3
     weight_decay: float = 1e-5
     entropy_coef: float = 0.0
+    normalize_reward: bool = False   # tanh-clip raw make-break reward
     epochs: int = 60
     warmup_epochs: int = 5
     max_flips: int = 10_000
@@ -110,14 +112,13 @@ class REINFORCETrainer:
 
         phi_t, idx_t, G_t = result
 
-        # Recompute with current weights — no stale graph
-        scores = self.policy.score_phi(phi_t)
-        log_probs = torch.log_softmax(scores, dim=0)
-        lp_t = log_probs[idx_t]
+        # Recompute log-probs with current weights (handles noise-walk mixture if present)
+        log_probs = self.policy.log_prob_phi(phi_t)
+        lp_t      = log_probs[idx_t]
 
         advantage = G_t - self._baseline   # subtract OLD baseline
-        entropy = -torch.sum(torch.exp(log_probs) * log_probs)
-        loss = -(lp_t * advantage) - self.config.entropy_coef * entropy
+        entropy   = -torch.sum(torch.exp(log_probs) * log_probs)
+        loss      = -(lp_t * advantage) - self.config.entropy_coef * entropy
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -125,7 +126,12 @@ class REINFORCETrainer:
 
         self._update_baseline(G_t)         # update AFTER gradient step
 
-        return {"loss": loss.item(), "return": G_t, "advantage": advantage, "entropy": entropy.item()}
+        return {
+            "loss":      loss.item(),
+            "return":    G_t,
+            "advantage": float(advantage),
+            "entropy":   entropy.item(),
+        }
 
     def _update_baseline(self, G_t: float) -> None:
         m = self.config.baseline_momentum
@@ -265,8 +271,11 @@ def train(
 
     for epoch in range(config.epochs):
         random.shuffle(train_formulas)
-        all_losses: list[float] = []
-        all_entropies: list[float] = []
+        all_losses:     list[float] = []
+        all_entropies:  list[float] = []
+        all_returns:    list[float] = []
+        all_rewards:    list[float] = []
+        all_advantages: list[float] = []
 
         for formula in train_formulas:
             state = SLSState.random_init(formula)
@@ -277,33 +286,56 @@ def train(
                     break
 
                 candidates = state.random_unsat_clause()
-                phi = extract_batch(candidates, state, policy.feature_set)
+                phi = extract_batch(candidates, state, policy.feature_set, normalize=policy.normalize)
 
                 with torch.no_grad():
-                    scores = policy.score_phi(phi)
-                    idx = int(torch.multinomial(torch.softmax(scores, dim=0), 1).item())
+                    log_probs_inf = policy.log_prob_phi(phi)
+                    idx = int(torch.multinomial(torch.exp(log_probs_inf), 1).item())
 
                 make_c, break_c = state.flip(candidates[idx], by_policy=True)
-                metrics = trainer.step(phi, idx, float(make_c - break_c))
+                reward = float(make_c - break_c)
+                if config.normalize_reward:
+                    reward = math.tanh(reward)
+                all_rewards.append(reward)
 
+                metrics = trainer.step(phi, idx, reward)
                 if metrics is not None:
                     all_losses.append(metrics["loss"])
                     all_entropies.append(metrics["entropy"])
+                    all_returns.append(metrics["return"])
+                    all_advantages.append(metrics["advantage"])
 
         scheduler.step()
 
-        mean_loss = float(np.mean(all_losses)) if all_losses else 0.0
-        mean_entropy = float(np.mean(all_entropies)) if all_entropies else 0.0
-        log.info("Epoch %d/%d  mean_loss=%.4f  mean_entropy=%.4f", epoch + 1, config.epochs, mean_loss, mean_entropy)
+        mean_loss      = float(np.mean(all_losses))     if all_losses     else 0.0
+        mean_entropy   = float(np.mean(all_entropies))  if all_entropies  else 0.0
+        mean_return    = float(np.mean(all_returns))    if all_returns    else 0.0
+        mean_reward    = float(np.mean(all_rewards))    if all_rewards    else 0.0
+        std_reward     = float(np.std(all_rewards))     if all_rewards    else 0.0
+        mean_advantage = float(np.mean(all_advantages)) if all_advantages else 0.0
+        std_advantage  = float(np.std(all_advantages))  if all_advantages else 0.0
+
+        log.info(
+            "Epoch %d/%d  loss=%.4f  entropy=%.4f  reward=%.3f±%.3f  adv=%.3f±%.3f",
+            epoch + 1, config.epochs, mean_loss, mean_entropy,
+            mean_reward, std_reward, mean_advantage, std_advantage,
+        )
         if log_fn:
-            log_fn({
-                "train/epoch":        epoch + 1,
-                "train/mean_loss":    mean_loss,
-                "train/mean_entropy": mean_entropy,
-                "train/n_updates":    len(all_losses),
-                "train/baseline":     trainer._baseline,
-                "train/lr":           scheduler.get_last_lr()[0],
-            }, step=epoch + 1)
+            metrics_dict = {
+                "train/mean_loss":      mean_loss,
+                "train/mean_entropy":   mean_entropy,
+                "train/mean_return":    mean_return,
+                "train/mean_reward":    mean_reward,
+                "train/std_reward":     std_reward,
+                "train/mean_advantage": mean_advantage,
+                "train/std_advantage":  std_advantage,
+                "train/n_updates":      len(all_losses),
+                "train/baseline":       trainer._baseline,
+                "train/lr":             scheduler.get_last_lr()[0],
+            }
+            if hasattr(policy, "noise_walk") and policy.noise_walk:
+                metrics_dict["train/noise_prob"] = policy.noise_prob
+            log_fn(metrics_dict, step=epoch + 1)
 
         if (epoch + 1) % config.val_every == 0:
             val_med = validate(val_formulas, policy, config)

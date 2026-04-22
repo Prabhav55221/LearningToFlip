@@ -51,7 +51,13 @@ BUDGETS = {
 log = logging.getLogger(__name__)
 
 
-def load_policy(name: str, model_path: Path | None, feature_set: str = "full"):
+def load_policy(
+    name: str,
+    model_path: Path | None,
+    feature_set: str = "full",
+    normalize_features: bool = False,
+    noise_walk: bool = False,
+):
     """Instantiate and optionally load weights for a named policy."""
     if name == "minbreak":
         return MinBreak()
@@ -76,7 +82,8 @@ def load_policy(name: str, model_path: Path | None, feature_set: str = "full"):
     if name == "mlp":
         if model_path is None:
             raise ValueError("--model-path is required for 'mlp' policy")
-        policy = MLPPolicy(feature_set=feature_set)
+        policy = MLPPolicy(feature_set=feature_set,
+                           normalize=normalize_features, noise_walk=noise_walk)
         state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
         policy.load_state_dict(state_dict)
         policy.eval()
@@ -152,6 +159,10 @@ def main() -> None:
         "--feature-set", choices=list(FEATURE_SETS.keys()), default="full",
         help="Feature set for linear/mlp policies (ignored for interian/baselines).",
     )
+    parser.add_argument("--normalize-features", action="store_true",
+                        help="Load MLP with feature normalization enabled (run7).")
+    parser.add_argument("--noise-walk", action="store_true",
+                        help="Load MLP with noise-walk enabled (run7).")
     parser.add_argument(
         "--max-tries", type=int, default=10,
         help="Number of random restarts per instance.",
@@ -190,7 +201,9 @@ def main() -> None:
     all_results: dict[str, dict] = {}
     for policy_name in args.policies:
         print(f"  Running {policy_name} ...", end="", flush=True)
-        policy = load_policy(policy_name, args.model_path, args.feature_set)
+        policy = load_policy(policy_name, args.model_path, args.feature_set,
+                             normalize_features=args.normalize_features,
+                             noise_walk=args.noise_walk)
         stats = evaluate_policy(policy, formulas, max_flips, args.max_tries)
         all_results[policy_name] = stats
         print(

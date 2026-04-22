@@ -26,10 +26,11 @@ from src.policy.features import extract_batch, FEATURE_SETS
 
 
 class LinearPolicy(nn.Module):
-    def __init__(self, feature_set: str = "interian") -> None:
+    def __init__(self, feature_set: str = "interian", normalize: bool = False) -> None:
         super().__init__()
         n_features = len(FEATURE_SETS[feature_set])
         self.feature_set = feature_set
+        self.normalize = normalize
         self.linear = nn.Linear(n_features, 1, bias=True)
         # Noise parameter w: p_w = 0.5 * sigmoid(w)
         # Initialized to 0 → p_w = 0.25 at start
@@ -46,7 +47,7 @@ class LinearPolicy(nn.Module):
         Uses torch.no_grad() — not suitable for gradient computation.
         """
         k = len(candidates)
-        phi = extract_batch(candidates, state, self.feature_set)
+        phi = extract_batch(candidates, state, self.feature_set, normalize=self.normalize)
         x = torch.from_numpy(phi).float()
 
         with torch.no_grad():
@@ -76,7 +77,7 @@ class LinearPolicy(nn.Module):
         p_mixture(x) = p_w / k  +  (1 - p_w) · softmax(f_θ(x))
         """
         k = len(candidates)
-        phi = extract_batch(candidates, state, self.feature_set)
+        phi = extract_batch(candidates, state, self.feature_set, normalize=self.normalize)
         x = torch.from_numpy(phi).float()
         scores = self.linear(x).squeeze(-1)              # (k,)
         probs_scoring = torch.softmax(scores, dim=0)     # (k,)
@@ -86,12 +87,16 @@ class LinearPolicy(nn.Module):
 
     def score_logits(self, candidates: list[int], state: SLSState) -> torch.Tensor:
         """Training: raw linear scores WITH gradient. No noise/mixture. Used by our REINFORCE."""
-        phi = extract_batch(candidates, state, self.feature_set)
+        phi = extract_batch(candidates, state, self.feature_set, normalize=self.normalize)
         x = torch.from_numpy(phi).float()
         return self.linear(x).squeeze(-1)
 
+    def log_prob_phi(self, phi: np.ndarray) -> torch.Tensor:
+        """Log-probabilities from pre-extracted features (plain softmax, no mixture)."""
+        return torch.log_softmax(self.linear(torch.from_numpy(phi).float()).squeeze(-1), dim=0)
+
     def score_phi(self, phi: np.ndarray) -> torch.Tensor:
-        """Score from a pre-extracted feature matrix (k, n_features). Used by REINFORCE trainer."""
+        """Raw linear scores from pre-extracted features. For backward compat."""
         return self.linear(torch.from_numpy(phi).float()).squeeze(-1)
 
     def is_learnable(self) -> bool:

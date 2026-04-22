@@ -137,9 +137,32 @@ def extract_named(var: int, state: SLSState, names: list[str]) -> np.ndarray:
     return np.array(vec, dtype=np.float32)
 
 
-def extract_batch(candidates: list[int], state: SLSState, feature_set: str = "full") -> np.ndarray:
+NORMALIZE_BY_DEG  = frozenset({"break", "make", "unsat_deg", "deg"})
+NORMALIZE_BY_STEP = frozenset({"age", "flip_count"})
+
+
+def extract_batch(
+    candidates: list[int],
+    state: SLSState,
+    feature_set: str = "full",
+    normalize: bool = False,
+) -> np.ndarray:
     """
     Extract features for all candidates at once.
     Returns shape (len(candidates), n_features) float32 array.
+
+    normalize=True divides count-valued features by avg_deg and time-valued
+    features by current step, making the policy scale-invariant across instance
+    sizes.  Interian features are pre-normalized and are never touched.
     """
-    return np.stack([extract(v, state, feature_set) for v in candidates])
+    phi = np.stack([extract(v, state, feature_set) for v in candidates])
+    if normalize and feature_set != "interian":
+        avg_deg   = max(1.0, float(np.mean(state._deg)))
+        step_norm = max(1.0, float(state.step))
+        names = FEATURE_SETS[feature_set]
+        for i, name in enumerate(names):
+            if name in NORMALIZE_BY_DEG:
+                phi[:, i] /= avg_deg
+            elif name in NORMALIZE_BY_STEP:
+                phi[:, i] /= step_norm
+    return phi

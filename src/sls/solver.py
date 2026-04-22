@@ -31,6 +31,7 @@ class StepRecord:
 class SolveResult:
     solved: bool
     n_flips: int
+    n_tries: int = 1
     trajectory: list[StepRecord] = field(default_factory=list)
 
 
@@ -79,6 +80,7 @@ def solve(
     result = SolveResult(solved=False, n_flips=0)
     for t in range(max_tries):
         result = run_try(formula, policy, max_flips, record_trajectory)
+        result.n_tries = t + 1
         status = f"solved in {result.n_flips} flips" if result.solved else f"timeout ({max_flips} flips)"
         log.debug("  try %d/%d: %s", t + 1, max_tries, status)
         if result.solved:
