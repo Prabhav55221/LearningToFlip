@@ -6,7 +6,7 @@
 #SBATCH -A jeisner1
 #SBATCH --mem-per-cpu=18GB
 #SBATCH --partition=cpu
-#SBATCH --time=16:00:00
+#SBATCH --time=60:00:00
 #SBATCH --output=logs/slurm/run6e_kclique_n10_%j.out
 #SBATCH --error=logs/slurm/run6e_kclique_n10_%j.err
 
