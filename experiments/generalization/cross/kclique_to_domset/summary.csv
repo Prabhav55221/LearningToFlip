@@ -1,0 +1,7 @@
+scale,policy,train_scale,model_label,n_instances,n_solved,solve_rate,median_cumulative_flips,mean_cumulative_flips,median_best_flips_solved,mean_best_flips_solved,par10,median_time_s,mean_time_s,total_time_s
+n7,minbreak,n5,cross_kclique_n5,100,100,100.0,417.5,554.0,13.0,13.2,554.0,0.0084,0.0101,1.01
+n7,noveltyplus,n5,cross_kclique_n5,100,100,100.0,263.0,307.6,13.0,13.6,307.6,0.0066,0.0072,0.72
+n7,interian(n5),n5,cross_kclique_n5,100,100,100.0,247.0,261.4,12.0,11.9,261.4,0.0203,0.0214,2.14
+n7,ours(cross_kclique_n5),n5,cross_kclique_n5,100,100,100.0,221.0,250.9,11.0,11.6,250.9,0.021,0.0235,2.35
+n7,ours_online_kl(cross_kclique_n5),n5,cross_kclique_n5,100,100,100.0,222.5,249.8,11.5,12.0,249.8,0.1061,0.1259,12.59
+n7,ours_online_success_kl(cross_kclique_n5),n5,cross_kclique_n5,100,100,100.0,213.5,245.2,11.0,11.6,245.2,0.0559,0.0627,6.27
