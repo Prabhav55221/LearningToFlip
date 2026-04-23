@@ -6,7 +6,7 @@
 #SBATCH -A jeisner1
 #SBATCH --mem-per-cpu=18GB
 #SBATCH --partition=cpu
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --output=logs/slurm/run7_kcoloring_n75_%j.out
 #SBATCH --error=logs/slurm/run7_kcoloring_n75_%j.err
 
