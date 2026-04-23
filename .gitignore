@@ -20,5 +20,4 @@ logs/*
 
 # OS
 .DS_Store
-wandb
 *.log

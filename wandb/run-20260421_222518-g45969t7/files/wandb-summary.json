@@ -1,0 +1,1 @@
+{"_timestamp":1.7768263836156867e+09,"_step":60,"val/median_flips":11,"train/n_updates":8724,"_runtime":1662.886936186,"train/epoch":60,"train/lr":2.1370139381221737e-05,"train/baseline":3.108079893695039,"warmup/mean_loss":0.5500325457542357,"train/mean_loss":-0.08506712427330151,"_wandb":{"runtime":1662}}
