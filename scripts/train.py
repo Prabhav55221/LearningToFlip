@@ -45,12 +45,14 @@ def main() -> None:
                         help="Multi-scale training: load data from all listed scales. Overrides --scale for data loading.")
     parser.add_argument("--policy",             choices=["linear", "mlp"],          default="mlp")
     parser.add_argument("--feature-set",        choices=list(FEATURE_SETS.keys()),  default="full")
+    parser.add_argument("--hidden-dim",         type=int, default=64,
+                        help="MLP hidden layer width.")
+    parser.add_argument("--n-layers",           type=int, default=2,
+                        help="Number of MLP hidden layers.")
+    parser.add_argument("--noise-prob",         type=float, default=0.0,
+                        help="Fixed random-walk probability per step (Interian escape mechanism).")
     parser.add_argument("--normalize-features", action="store_true",
                         help="Normalize count features by avg_deg and time features by step.")
-    parser.add_argument("--noise-walk",    action="store_true",
-                        help="Add learned noise-walk probability (like Interian) to MLP policy.")
-    parser.add_argument("--reward-normalize", action="store_true",
-                        help="Apply tanh to raw make-break reward before REINFORCE update.")
     parser.add_argument("--k",             type=int,   default=10)
     parser.add_argument("--gamma",         type=float, default=0.5)
     parser.add_argument("--lr",            type=float, default=1e-3)
@@ -80,10 +82,10 @@ def main() -> None:
         run_name += "_ms"
     if args.normalize_features:
         run_name += "_norm"
-    if args.noise_walk:
-        run_name += "_nw"
-    if args.reward_normalize:
-        run_name += "_rn"
+    if args.noise_prob > 0.0:
+        run_name += "_fw"
+    if args.hidden_dim < 64 or args.n_layers < 2:
+        run_name += "_sm"
 
     log_fn = None
     if args.wandb:
@@ -108,11 +110,11 @@ def main() -> None:
                 "seed": args.seed,
             },
             tags=["ours", args.policy, args.feature_set, args.family, args.scale,
-                  *( ["entropy"]          if args.entropy_coef > 0    else []),
-                  *( ["multiscale"]       if len(scales) > 1          else []),
-                  *( ["normalize"]        if args.normalize_features  else []),
-                  *( ["noise_walk"]       if args.noise_walk          else []),
-                  *( ["reward_normalize"] if args.reward_normalize    else [])],
+                  *( ["entropy"]    if args.entropy_coef > 0   else []),
+                  *( ["multiscale"] if len(scales) > 1         else []),
+                  *( ["normalize"]  if args.normalize_features else []),
+                  *( ["fixed_walk"] if args.noise_prob > 0.0   else []),
+                  *( ["small_mlp"]  if args.hidden_dim < 64    else [])],
         )
         log_fn = wandb.log
 
@@ -138,8 +140,10 @@ def main() -> None:
         if args.policy == "linear"
         else MLPPolicy(
             feature_set=args.feature_set,
+            hidden_dim=args.hidden_dim,
+            n_layers=args.n_layers,
             normalize=args.normalize_features,
-            noise_walk=args.noise_walk,
+            noise_prob=args.noise_prob,
         )
     )
 
@@ -148,7 +152,6 @@ def main() -> None:
         gamma=args.gamma,
         lr=args.lr,
         entropy_coef=args.entropy_coef,
-        normalize_reward=args.reward_normalize,
         epochs=args.epochs,
         warmup_epochs=args.warmup_epochs,
         max_flips=max_flips,

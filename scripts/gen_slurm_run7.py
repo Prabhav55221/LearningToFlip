@@ -1,7 +1,11 @@
 """
-Generate Slurm scripts for Run 7: MLP / full features / entropy + normalize + noise-walk + reward-normalize.
+Generate Slurm scripts for Run 7.
 
-Writes one script per (family, scale) to slurmrun/ours/run7/.
+Run 7 = mlp / full features / entropy + normalize + fixed noise walk + small MLP (16×1).
+Noise walk probabilities are per-family constants from Interian's p_dict.
+
+Checkpoint name: mlp_full_e_norm_fw_sm
+
 Usage:
     python scripts/gen_slurm_run7.py
 """
@@ -14,13 +18,23 @@ HOME      = "/home/psingh54"
 SCRATCH   = f"{HOME}/scratchjeisner1/psingh54/LearningToFlip"
 
 ENTROPY_COEF = 0.1
+HIDDEN_DIM   = 16
+N_LAYERS     = 1
 EPOCHS       = 60
 WARMUP       = 5
 LR           = "1e-3"
 SEED         = 42
 
-RUN_NAME   = "mlp_full_e_norm_nw_rn"
-RUN_LABEL  = "run7"
+# Fixed noise-walk probabilities from Interian p_dict
+NOISE_PROBS = {
+    "kcoloring":   0.0895,
+    "random_3sat": 0.0644,
+    "kclique":     0.1218,
+    "domset":      0.0693,
+}
+
+RUN_NAME  = "mlp_full_e_norm_fw_sm"
+RUN_LABEL = "run7"
 
 FAMILIES = {
     "kcoloring":   ["n50", "n75", "n100"],
@@ -40,15 +54,16 @@ SCALE_NUM = {
     "n5": "5", "n7": "7", "n9": "9",
     "n10": "10", "n12": "12", "n15": "15", "n20": "20",
     "n40": "40", "n50": "50", "n60": "60", "n70": "70",
-    "n75": "75", "n100": "100", "n200": "200", "n300": "300",
+    "n75": "75", "n100": "100",
 }
 
 
 def script(family: str, scale: str) -> str:
-    abbrev   = ABBREVS[family]
-    num      = SCALE_NUM[scale]
-    job_name = f"R7_{abbrev}_{num}"
-    log_stem = f"{RUN_LABEL}_{family}_{scale}"
+    abbrev      = ABBREVS[family]
+    num         = SCALE_NUM[scale]
+    noise_prob  = NOISE_PROBS[family]
+    job_name    = f"R7_{abbrev}_{num}"
+    log_stem    = f"{RUN_LABEL}_{family}_{scale}"
     model_dir   = f"experiments/models/{family}/{scale}/{RUN_NAME}"
     results_dir = f"experiments/results/ours/{RUN_LABEL}/{family}"
     model_path  = f"{model_dir}/best_{RUN_NAME}.pt"
@@ -59,10 +74,11 @@ def script(family: str, scale: str) -> str:
         f"    --scale {scale} \\\n"
         f"    --policy mlp \\\n"
         f"    --feature-set full \\\n"
+        f"    --hidden-dim {HIDDEN_DIM} \\\n"
+        f"    --n-layers {N_LAYERS} \\\n"
         f"    --entropy-coef {ENTROPY_COEF} \\\n"
         f"    --normalize-features \\\n"
-        f"    --noise-walk \\\n"
-        f"    --reward-normalize \\\n"
+        f"    --noise-prob {noise_prob} \\\n"
         f"    --epochs {EPOCHS} \\\n"
         f"    --warmup-epochs {WARMUP} \\\n"
         f"    --gamma 0.5 \\\n"
@@ -79,7 +95,9 @@ def script(family: str, scale: str) -> str:
         f"    --policies minbreak noveltyplus mlp \\\n"
         f"    --feature-set full \\\n"
         f"    --normalize-features \\\n"
-        f"    --noise-walk \\\n"
+        f"    --hidden-dim {HIDDEN_DIM} \\\n"
+        f"    --n-layers {N_LAYERS} \\\n"
+        f"    --noise-prob {noise_prob} \\\n"
         f"    --model-path {model_path} \\\n"
         f"    --max-tries 10 \\\n"
         f"    --save-csv {results_dir}/{scale}_val.csv"
@@ -110,7 +128,7 @@ mkdir -p {model_dir}
 mkdir -p {results_dir}
 mkdir -p logs/slurm
 
-echo "===== Run 7: mlp/full+entropy+norm+noise_walk+reward_norm | {family}/{scale} ====="
+echo "===== Run 7: mlp/full+entropy+norm+fixed_walk(p={noise_prob})+small | {family}/{scale} ====="
 echo "Start: $(date)"
 TOTAL_START=$(date +%s)
 
@@ -137,23 +155,23 @@ def main() -> None:
     generated = []
     for family, scales in FAMILIES.items():
         for scale in scales:
-            content  = script(family, scale)
-            fname    = f"run_{RUN_LABEL}_{family}_{scale}.sh"
-            fpath    = out_dir / fname
+            content = script(family, scale)
+            fname   = f"run_{RUN_LABEL}_{family}_{scale}.sh"
+            fpath   = out_dir / fname
             fpath.write_text(content)
             fpath.chmod(0o755)
             generated.append(str(fpath))
             print(f"  wrote {fpath}")
 
     print(f"\n{len(generated)} scripts written to {out_dir}/")
-    print("\nsbatch all run7 scripts:")
-    print(f"  for f in {out_dir}/*.sh; do sbatch $f; done")
-    print("\nsbatch run7 (exclude random_3sat):")
+    print("\nsbatch all run7 (exclude random_3sat):")
     print(
         f"  for f in {out_dir}/*.sh; do "
         "[[ $f != *random_3sat* ]] && sbatch \"$f\"; "
         "done"
     )
+    print("\nsbatch all run7:")
+    print(f"  for f in {out_dir}/*.sh; do sbatch \"$f\"; done")
 
 
 if __name__ == "__main__":

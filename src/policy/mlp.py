@@ -3,13 +3,17 @@ MLP scoring policy — main contribution.
 
 score(x) = MLP(φ(x, state))
 
-Small, shallow MLP (2 hidden layers, ReLU). The linear policy is a strict
-special case; this captures nonlinear feature interactions.
+Hidden dim and depth are configurable; default (64, 2) for full experiments,
+(16, 1) for the generalization-focused run7 (small model, fewer params).
 
-noise_walk=True adds a learned noise-walk probability p_w = 0.5·sigmoid(w),
-matching Interian's escape mechanism: with probability p_w a random variable
-is chosen; otherwise the MLP softmax is used. Training uses the mixture
-log-prob so the policy learns to calibrate p_w jointly with the MLP weights.
+noise_prob: fixed random-walk probability matching Interian's escape mechanism.
+  - At inference: with prob noise_prob pick a random candidate (by_policy=False)
+  - At training: noise steps fire in the training loop but do NOT push to the
+    REINFORCE buffer — gradient only flows through policy-selected actions.
+  - Not learned; set per family from the Interian p_dict values.
+
+normalize: divide count features by avg_deg and time features by step —
+  makes the policy scale-invariant across instance sizes (critical for generalization).
 """
 
 import math
@@ -28,12 +32,12 @@ class MLPPolicy(nn.Module):
         hidden_dim: int = 64,
         n_layers: int = 2,
         normalize: bool = False,
-        noise_walk: bool = False,
+        noise_prob: float = 0.0,
     ) -> None:
         super().__init__()
         self.feature_set = feature_set
         self.normalize   = normalize
-        self.noise_walk  = noise_walk
+        self.noise_prob  = noise_prob   # fixed, not learned
         n_features = len(FEATURE_SETS[feature_set])
 
         layers: list[nn.Module] = []
@@ -44,59 +48,30 @@ class MLPPolicy(nn.Module):
         layers.append(nn.Linear(in_dim, 1))
         self.net = nn.Sequential(*layers)
 
-        if noise_walk:
-            # p_w = 0.5 * sigmoid(noise_param); init → p_w ≈ 0.25
-            self.noise_param = nn.Parameter(torch.zeros(1))
-
-    @property
-    def noise_prob(self) -> float:
-        if not self.noise_walk:
-            return 0.0
-        return float(0.5 * torch.sigmoid(self.noise_param).item())
-
     def select(self, candidates: list[int], state: SLSState) -> tuple[int, float, bool]:
-        """Inference: mixture-aware softmax sample, no gradient."""
+        """Inference: softmax sample with optional fixed noise walk."""
         k   = len(candidates)
         phi = extract_batch(candidates, state, self.feature_set, normalize=self.normalize)
-        x   = torch.from_numpy(phi)
+
+        # Fixed noise walk — random escape, no gradient involvement
+        if self.noise_prob > 0.0 and random.random() < self.noise_prob:
+            idx = random.randint(0, k - 1)
+            return candidates[idx], math.log(1.0 / k), False
+
+        x = torch.from_numpy(phi)
         with torch.no_grad():
             scores = self.net(x).squeeze(-1)
-            probs_scoring = torch.softmax(scores, dim=0)
-
-            if self.noise_walk:
-                pw = float(0.5 * torch.sigmoid(self.noise_param).item())
-                if random.random() < pw:
-                    idx        = random.randint(0, k - 1)
-                    by_policy  = False
-                else:
-                    idx        = int(torch.multinomial(probs_scoring, 1).item())
-                    by_policy  = True
-                prob_mix   = pw / k + (1.0 - pw) * probs_scoring[idx].item()
-                log_prob   = math.log(max(prob_mix, 1e-9))
-            else:
-                idx        = int(torch.multinomial(probs_scoring, 1).item())
-                log_prob   = float(torch.log(probs_scoring[idx]).item())
-                by_policy  = True
-
-        return candidates[idx], log_prob, by_policy
+            probs  = torch.softmax(scores, dim=0)
+        idx      = int(torch.multinomial(probs, 1).item())
+        log_prob = float(torch.log(probs[idx]).item())
+        return candidates[idx], log_prob, True
 
     def log_prob_phi(self, phi: np.ndarray) -> torch.Tensor:
-        """
-        Log-probabilities for each candidate from a pre-extracted feature matrix.
-        Accounts for noise-walk mixture when noise_walk=True.
-        Used by REINFORCE trainer — keeps gradient graph.
-        """
+        """Log-probabilities from pre-extracted features (with gradient). Used by REINFORCE trainer."""
         scores = self.net(torch.from_numpy(phi).float()).squeeze(-1)
-        if self.noise_walk:
-            k             = scores.shape[0]
-            probs_scoring = torch.softmax(scores, dim=0)
-            pw            = 0.5 * torch.sigmoid(self.noise_param)
-            probs_mixture = pw / k + (1.0 - pw) * probs_scoring
-            return torch.log(probs_mixture + 1e-9)
         return torch.log_softmax(scores, dim=0)
 
     def score_tensor(self, candidates: list[int], state: SLSState) -> torch.Tensor:
-        """Training: raw MLP scores with gradient (no noise mixture)."""
         phi = extract_batch(candidates, state, self.feature_set, normalize=self.normalize)
         return self.net(torch.from_numpy(phi)).squeeze(-1)
 
@@ -104,7 +79,6 @@ class MLPPolicy(nn.Module):
         return self.score_tensor(candidates, state)
 
     def score_phi(self, phi: np.ndarray) -> torch.Tensor:
-        """Raw MLP scores from pre-extracted features. For backward compat."""
         return self.net(torch.from_numpy(phi).float()).squeeze(-1)
 
     def is_learnable(self) -> bool:

@@ -56,7 +56,7 @@ def load_policy(
     model_path: Path | None,
     feature_set: str = "full",
     normalize_features: bool = False,
-    noise_walk: bool = False,
+    **kwargs,
 ):
     """Instantiate and optionally load weights for a named policy."""
     if name == "minbreak":
@@ -82,8 +82,13 @@ def load_policy(
     if name == "mlp":
         if model_path is None:
             raise ValueError("--model-path is required for 'mlp' policy")
-        policy = MLPPolicy(feature_set=feature_set,
-                           normalize=normalize_features, noise_walk=noise_walk)
+        policy = MLPPolicy(
+            feature_set=feature_set,
+            hidden_dim=kwargs.get("hidden_dim", 64),
+            n_layers=kwargs.get("n_layers", 2),
+            normalize=normalize_features,
+            noise_prob=kwargs.get("noise_prob", 0.0),
+        )
         state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
         policy.load_state_dict(state_dict)
         policy.eval()
@@ -160,9 +165,11 @@ def main() -> None:
         help="Feature set for linear/mlp policies (ignored for interian/baselines).",
     )
     parser.add_argument("--normalize-features", action="store_true",
-                        help="Load MLP with feature normalization enabled (run7).")
-    parser.add_argument("--noise-walk", action="store_true",
-                        help="Load MLP with noise-walk enabled (run7).")
+                        help="Load MLP with feature normalization enabled.")
+    parser.add_argument("--hidden-dim",    type=int,   default=64)
+    parser.add_argument("--n-layers",      type=int,   default=2)
+    parser.add_argument("--noise-prob",    type=float, default=0.0,
+                        help="Fixed walk probability for MLP inference.")
     parser.add_argument(
         "--max-tries", type=int, default=10,
         help="Number of random restarts per instance.",
@@ -201,9 +208,13 @@ def main() -> None:
     all_results: dict[str, dict] = {}
     for policy_name in args.policies:
         print(f"  Running {policy_name} ...", end="", flush=True)
-        policy = load_policy(policy_name, args.model_path, args.feature_set,
-                             normalize_features=args.normalize_features,
-                             noise_walk=args.noise_walk)
+        policy = load_policy(
+            policy_name, args.model_path, args.feature_set,
+            normalize_features=args.normalize_features,
+            hidden_dim=args.hidden_dim,
+            n_layers=args.n_layers,
+            noise_prob=args.noise_prob,
+        )
         stats = evaluate_policy(policy, formulas, max_flips, args.max_tries)
         all_results[policy_name] = stats
         print(

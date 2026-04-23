@@ -18,11 +18,11 @@ export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
 set -e
 
-mkdir -p experiments/models/kclique/n20/mlp_full_e_norm_nw_rn
+mkdir -p experiments/models/kclique/n20/mlp_full_e_norm_fw_sm
 mkdir -p experiments/results/ours/run7/kclique
 mkdir -p logs/slurm
 
-echo "===== Run 7: mlp/full+entropy+norm+noise_walk+reward_norm | kclique/n20 ====="
+echo "===== Run 7: mlp/full+entropy+norm+fixed_walk(p=0.1218)+small | kclique/n20 ====="
 echo "Start: $(date)"
 TOTAL_START=$(date +%s)
 
@@ -32,10 +32,11 @@ python scripts/train.py \
     --scale n20 \
     --policy mlp \
     --feature-set full \
+    --hidden-dim 16 \
+    --n-layers 1 \
     --entropy-coef 0.1 \
     --normalize-features \
-    --noise-walk \
-    --reward-normalize \
+    --noise-prob 0.1218 \
     --epochs 60 \
     --warmup-epochs 5 \
     --gamma 0.5 \
@@ -53,8 +54,10 @@ python scripts/evaluate.py \
     --policies minbreak noveltyplus mlp \
     --feature-set full \
     --normalize-features \
-    --noise-walk \
-    --model-path experiments/models/kclique/n20/mlp_full_e_norm_nw_rn/best_mlp_full_e_norm_nw_rn.pt \
+    --hidden-dim 16 \
+    --n-layers 1 \
+    --noise-prob 0.1218 \
+    --model-path experiments/models/kclique/n20/mlp_full_e_norm_fw_sm/best_mlp_full_e_norm_fw_sm.pt \
     --max-tries 10 \
     --save-csv experiments/results/ours/run7/kclique/n20_val.csv
 END=$(date +%s)

@@ -281,11 +281,20 @@ def train(
             state = SLSState.random_init(formula)
             trainer.reset()
 
+            noise_p = getattr(policy, "noise_prob", 0.0)
+
             for _ in range(config.max_flips):
                 if state.is_solved:
                     break
 
                 candidates = state.random_unsat_clause()
+
+                # Fixed noise walk: random flip, no REINFORCE gradient (matches Interian)
+                if noise_p > 0.0 and random.random() < noise_p:
+                    idx = random.randint(0, len(candidates) - 1)
+                    state.flip(candidates[idx], by_policy=False)
+                    continue
+
                 phi = extract_batch(candidates, state, policy.feature_set, normalize=policy.normalize)
 
                 with torch.no_grad():
@@ -294,8 +303,6 @@ def train(
 
                 make_c, break_c = state.flip(candidates[idx], by_policy=True)
                 reward = float(make_c - break_c)
-                if config.normalize_reward:
-                    reward = math.tanh(reward)
                 all_rewards.append(reward)
 
                 metrics = trainer.step(phi, idx, reward)
