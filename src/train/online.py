@@ -59,6 +59,14 @@ class OnlineKLConfig:
     baseline_momentum: float = 0.99
 
 
+@dataclass
+class OnlineEvalResult:
+    solved: bool
+    best_flips: int
+    cumulative_flips: int
+    n_tries: int
+
+
 class OnlineKLAdapter:
     """Per-step k-step REINFORCE with a KL anchor to the frozen offline policy."""
 
@@ -151,6 +159,40 @@ class OnlineKLAdapter:
                 return SolveResult(solved=True, n_flips=n_flips, n_tries=t + 1)
 
         return SolveResult(solved=False, n_flips=max_flips, n_tries=max_tries)
+
+    def evaluate(
+        self,
+        formula: CNFFormula,
+        max_flips: int,
+        max_tries: int = 10,
+        reset: bool = True,
+    ) -> OnlineEvalResult:
+        if reset:
+            self.reset_to_offline()
+
+        solved_any = False
+        best_flips = max_flips
+        cumulative_flips = 0
+
+        for t in range(max_tries):
+            solved, n_flips = self._run_try(formula, max_flips)
+            cumulative_flips += n_flips
+            log.debug(
+                "  try %d/%d: %s",
+                t + 1,
+                max_tries,
+                f"solved in {n_flips}" if solved else f"timeout ({max_flips})",
+            )
+            if solved and ((not solved_any) or (n_flips < best_flips)):
+                solved_any = True
+                best_flips = n_flips
+
+        return OnlineEvalResult(
+            solved=solved_any,
+            best_flips=best_flips,
+            cumulative_flips=cumulative_flips,
+            n_tries=max_tries,
+        )
 
 
 @dataclass
@@ -267,3 +309,42 @@ class OnlineSuccessKLAdapter:
             best_result.n_tries = best_try
             return best_result
         return SolveResult(solved=False, n_flips=max_flips, n_tries=max_tries)
+
+    def evaluate(
+        self,
+        formula: CNFFormula,
+        max_flips: int,
+        max_tries: int = 10,
+        reset: bool = True,
+    ) -> OnlineEvalResult:
+        if reset:
+            self.reset_to_offline()
+
+        solved_any = False
+        best_flips = max_flips
+        cumulative_flips = 0
+
+        for t in range(max_tries):
+            solved, n_flips, trajectory = self._run_try(formula, max_flips)
+            cumulative_flips += n_flips
+            if solved:
+                if (not solved_any) or (n_flips < best_flips):
+                    solved_any = True
+                    best_flips = n_flips
+                loss = self._fine_tune(trajectory)
+                log.debug(
+                    "  try %d/%d: solved in %d  fine_tune_loss=%.4f",
+                    t + 1,
+                    max_tries,
+                    n_flips,
+                    loss,
+                )
+            else:
+                log.debug("  try %d/%d: timeout (%d)", t + 1, max_tries, max_flips)
+
+        return OnlineEvalResult(
+            solved=solved_any,
+            best_flips=best_flips,
+            cumulative_flips=cumulative_flips,
+            n_tries=max_tries,
+        )

@@ -2,9 +2,11 @@
 
 import torch
 
+import scripts.eval_generalization as generalization
 from scripts.eval_generalization import infer_mlp_architecture
 from src.policy.mlp import MLPPolicy
 from src.sat.parser import parse_dimacs
+from src.sls.solver import SolveResult
 from src.train.online import (
     OnlineKLAdapter,
     OnlineKLConfig,
@@ -74,3 +76,64 @@ def test_online_adapters_reset_to_offline(tmp_path):
 
     for key, value in success_offline.items():
         assert torch.allclose(success_policy.state_dict()[key], value)
+
+
+def test_eval_restart_policy_uses_all_tries_and_reports_cumulative(monkeypatch):
+    calls = []
+    outcomes = [
+        SolveResult(solved=False, n_flips=10),
+        SolveResult(solved=True, n_flips=4),
+        SolveResult(solved=True, n_flips=7),
+    ]
+
+    def fake_run_try(formula, policy, max_flips):
+        calls.append((formula, policy, max_flips))
+        return outcomes[len(calls) - 1]
+
+    monkeypatch.setattr(generalization, "run_try", fake_run_try)
+
+    result = generalization.eval_restart_policy(
+        policy=object(),
+        formula=object(),
+        max_flips=10,
+        max_tries=3,
+    )
+
+    assert len(calls) == 3
+    assert result == {
+        "solved": True,
+        "best_flips": 4,
+        "cumulative_flips": 21,
+        "n_tries": 3,
+    }
+
+
+def test_online_success_adapter_evaluate_reports_cumulative_effort(tmp_path, monkeypatch):
+    formula = _trivial_formula(tmp_path)
+    policy = MLPPolicy(feature_set="full", hidden_dim=8, n_layers=1)
+    adapter = OnlineSuccessKLAdapter(policy, OnlineSuccessKLConfig())
+
+    outcomes = iter([
+        (False, 10, []),
+        (True, 3, [("phi", 0)]),
+        (True, 5, [("phi", 0)]),
+    ])
+    fine_tunes = []
+
+    def fake_run_try(formula, max_flips):
+        return next(outcomes)
+
+    def fake_fine_tune(trajectory):
+        fine_tunes.append(len(trajectory))
+        return 0.0
+
+    monkeypatch.setattr(adapter, "_run_try", fake_run_try)
+    monkeypatch.setattr(adapter, "_fine_tune", fake_fine_tune)
+
+    result = adapter.evaluate(formula, max_flips=10, max_tries=3, reset=False)
+
+    assert result.solved is True
+    assert result.best_flips == 3
+    assert result.cumulative_flips == 18
+    assert result.n_tries == 3
+    assert fine_tunes == [1, 1]

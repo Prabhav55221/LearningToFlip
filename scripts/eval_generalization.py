@@ -24,7 +24,7 @@ from src.policy.baselines import MinBreak, NoveltyPlus
 from src.policy.linear import LinearPolicy
 from src.policy.mlp import MLPPolicy
 from src.sat.parser import parse_dimacs
-from src.sls.solver import solve
+from src.sls.solver import run_try
 from src.train.online import (
     OnlineKLAdapter,
     OnlineKLConfig,
@@ -36,6 +36,7 @@ from src.utils.logging import setup as setup_logging
 log = logging.getLogger(__name__)
 
 BUDGETS = {
+    "n3": 300,
     "n5": 500,
     "n7": 700,
     "n9": 900,
@@ -43,6 +44,7 @@ BUDGETS = {
     "n12": 1_200,
     "n15": 1_500,
     "n20": 2_000,
+    "n30": 3_000,
     "n40": 4_000,
     "n50": 5_000,
     "n60": 6_000,
@@ -54,9 +56,9 @@ BUDGETS = {
 }
 
 FAMILY_SCALES = {
-    "kcoloring": ["n50", "n75", "n100", "n200", "n300"],
+    "kcoloring": ["n10", "n20", "n30", "n50", "n75", "n100"],
     "random_3sat": ["n40", "n50", "n60", "n70", "n100", "n200"],
-    "kclique": ["n5", "n10", "n15", "n20"],
+    "kclique": ["n3", "n5", "n10", "n12", "n15", "n20"],
     "domset": ["n5", "n7", "n9", "n12"],
 }
 
@@ -153,6 +155,27 @@ def load_policies(args) -> dict[str, object]:
     return policies
 
 
+def eval_restart_policy(policy, formula, max_flips, max_tries):
+    solved_any = False
+    best_flips = max_flips
+    cumulative_flips = 0
+
+    with torch.no_grad():
+        for _ in range(max_tries):
+            result = run_try(formula, policy, max_flips)
+            cumulative_flips += result.n_flips
+            if result.solved and ((not solved_any) or (result.n_flips < best_flips)):
+                solved_any = True
+                best_flips = result.n_flips
+
+    return {
+        "solved": solved_any,
+        "best_flips": best_flips,
+        "cumulative_flips": cumulative_flips,
+        "n_tries": max_tries,
+    }
+
+
 def eval_policy_on_scale(policy, formulas, max_flips, max_tries):
     is_online = isinstance(policy, (OnlineKLAdapter, OnlineSuccessKLAdapter))
     records = []
@@ -160,37 +183,43 @@ def eval_policy_on_scale(policy, formulas, max_flips, max_tries):
     for i, formula in enumerate(formulas):
         t0 = time.perf_counter()
         if is_online:
-            result = policy.solve(formula, max_flips, max_tries, reset=True)
+            result = policy.evaluate(formula, max_flips, max_tries, reset=True)
         else:
-            with torch.no_grad():
-                result = solve(formula, policy, max_flips, max_tries)
+            result = eval_restart_policy(policy, formula, max_flips, max_tries)
         elapsed = time.perf_counter() - t0
         records.append({
             "instance_idx": i,
-            "solved": result.solved,
-            "n_flips": result.n_flips,
-            "n_tries": result.n_tries,
+            "solved": result.solved if is_online else result["solved"],
+            "best_flips": result.best_flips if is_online else result["best_flips"],
+            "cumulative_flips": result.cumulative_flips if is_online else result["cumulative_flips"],
+            "n_tries": result.n_tries if is_online else result["n_tries"],
             "time_s": round(elapsed, 4),
         })
 
     return records
 
 
-def aggregate(records, max_flips):
+def aggregate(records, max_flips, max_tries):
     n = len(records)
     n_solved = sum(1 for r in records if r["solved"])
-    flips = [r["n_flips"] for r in records]
+    cumulative_flips = [r["cumulative_flips"] for r in records]
+    best_flips = [r["best_flips"] for r in records]
+    best_flips_solved = [r["best_flips"] for r in records if r["solved"]]
     times = [r["time_s"] for r in records]
     par10 = float(np.mean([
-        f if r["solved"] else 10 * max_flips
-        for f, r in zip(flips, records)
+        f if r["solved"] else 10 * max_flips * max_tries
+        for f, r in zip(cumulative_flips, records)
     ]))
     return {
         "n_instances": n,
         "n_solved": n_solved,
         "solve_rate": round(n_solved / n * 100, 1),
-        "median_flips": round(float(np.median(flips)), 1),
-        "mean_flips": round(float(np.mean(flips)), 1),
+        "median_cumulative_flips": round(float(np.median(cumulative_flips)), 1),
+        "mean_cumulative_flips": round(float(np.mean(cumulative_flips)), 1),
+        # Conditional on solved instances only — avoids sentinel inflation at low solve rates.
+        # None when nothing is solved.
+        "median_best_flips_solved": round(float(np.median(best_flips_solved)), 1) if best_flips_solved else None,
+        "mean_best_flips_solved": round(float(np.mean(best_flips_solved)), 1) if best_flips_solved else None,
         "par10": round(par10, 1),
         "median_time_s": round(float(np.median(times)), 4),
         "mean_time_s": round(float(np.mean(times)), 4),
@@ -203,16 +232,19 @@ def print_scale_table(scale, max_flips, results):
     print(f"  {scale}  (budget={max_flips:,} flips/try)")
     print(f"{'=' * 88}")
     header = (
-        f"{'Policy':<30}  {'Median':>7}  {'Mean':>8}  {'PAR-10':>9}  "
-        f"{'Solve%':>7}  {'Solved':>8}  {'AvgTime':>8}"
+        f"{'Policy':<30}  {'MedCum':>8}  {'MeanCum':>8}  {'MedBest|sol':>11}  "
+        f"{'PAR-10':>9}  {'Solve%':>7}  {'Solved':>8}  {'AvgTime':>8}"
     )
     print(header)
     print("-" * len(header))
     for name, agg in results.items():
+        med_best = agg["median_best_flips_solved"]
+        med_best_str = f"{med_best:>11.0f}" if med_best is not None else f"{'—':>11}"
         print(
             f"{name:<30}  "
-            f"{agg['median_flips']:>7.0f}  "
-            f"{agg['mean_flips']:>8.0f}  "
+            f"{agg['median_cumulative_flips']:>8.0f}  "
+            f"{agg['mean_cumulative_flips']:>8.0f}  "
+            f"{med_best_str}  "
             f"{agg['par10']:>9.0f}  "
             f"{agg['solve_rate']:>6.1f}%  "
             f"{agg['n_solved']:>4}/{agg['n_instances']:<3}  "
@@ -265,10 +297,14 @@ def main():
     args.save_dir.mkdir(parents=True, exist_ok=True)
 
     summary_rows = []
-    instance_fieldnames = ["scale", "policy", "instance_idx", "solved", "n_flips", "n_tries", "time_s"]
+    instance_fieldnames = [
+        "scale", "policy", "instance_idx", "solved",
+        "cumulative_flips", "best_flips", "n_tries", "time_s",
+    ]
     summary_fieldnames = [
         "scale", "policy", "train_scale", "model_label", "n_instances", "n_solved",
-        "solve_rate", "median_flips", "mean_flips", "par10",
+        "solve_rate", "median_cumulative_flips", "mean_cumulative_flips",
+        "median_best_flips_solved", "mean_best_flips_solved", "par10",
         "median_time_s", "mean_time_s", "total_time_s",
     ]
 
@@ -296,10 +332,10 @@ def main():
             print(f"  {name} ...", end="", flush=True)
             t_scale = time.perf_counter()
             records = eval_policy_on_scale(policy, formulas, max_flips, args.max_tries)
-            agg = aggregate(records, max_flips)
+            agg = aggregate(records, max_flips, args.max_tries)
             scale_results[name] = agg
             print(
-                f"  median={agg['median_flips']:.0f}  solve={agg['solve_rate']}%  "
+                f"  median_cum={agg['median_cumulative_flips']:.0f}  solve={agg['solve_rate']}%  "
                 f"par10={agg['par10']:.0f}  ({time.perf_counter() - t_scale:.1f}s)"
             )
 

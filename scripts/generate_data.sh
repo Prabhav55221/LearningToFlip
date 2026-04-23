@@ -103,10 +103,14 @@ for split in train val test; do
 done
 
 echo "==> Generating k-coloring generalization test sets..."
+# Smaller scales test downward generalization from training scale n50.
+generate kcoloring n10  test "$N_GENTEST" kcolor 5 gnp 2  0.5
+generate kcoloring n20  test "$N_GENTEST" kcolor 5 gnp 4  0.5
+generate kcoloring n30  test "$N_GENTEST" kcolor 5 gnp 6  0.5
 # Lower density (0.2/0.15 vs 0.5) keeps χ < 5 for larger graphs.
 # G(40,0.5) has χ≈6-8 empirically, making 5-coloring UNSAT for almost all instances.
-generate_test_only kcoloring n200 "$N_GENTEST" kcolor 5 gnp 40 0.2
-generate_test_only kcoloring n300 "$N_GENTEST" kcolor 5 gnp 60 0.15
+generate kcoloring n200 test "$N_GENTEST" kcolor 5 gnp 40 0.2
+generate kcoloring n300 test "$N_GENTEST" kcolor 5 gnp 60 0.15
 
 # ── random 3-SAT: at phase transition (ratio ≈ 4.27) ───────────────────────
 echo "==> Generating random 3-SAT instances (training splits)..."
@@ -132,6 +136,11 @@ for split in train val test; do
     generate kclique n15 "$split" "$N" kclique 3 gnp 15 0.066
     generate kclique n20 "$split" "$N" kclique 3 gnp 20 0.05
 done
+
+echo "==> Generating k-clique generalization test sets..."
+# n3: trivially small; n12 fills gap between training n10 and n15.
+generate kclique n3  test "$N_GENTEST" kclique 3 gnp 3  0.5
+generate kclique n12 test "$N_GENTEST" kclique 3 gnp 12 0.083
 
 # ── dominating set: n vars = n_nodes ───────────────────────────────────────
 # Scales match Interian & Bernardini (KR 2023) exactly.

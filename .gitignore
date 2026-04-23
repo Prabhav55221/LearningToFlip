@@ -22,3 +22,5 @@ logs/*
 .DS_Store
 *.log
 wandb
+
+PAPER
