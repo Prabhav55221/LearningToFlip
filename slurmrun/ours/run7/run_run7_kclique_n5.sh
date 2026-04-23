@@ -6,7 +6,7 @@
 #SBATCH -A jeisner1
 #SBATCH --mem-per-cpu=18GB
 #SBATCH --partition=cpu
-#SBATCH --time=24:00:00
+#SBATCH --time=16:00:00
 #SBATCH --output=logs/slurm/run7_kclique_n5_%j.out
 #SBATCH --error=logs/slurm/run7_kclique_n5_%j.err
 
@@ -18,11 +18,11 @@ export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
 set -e
 
-mkdir -p experiments/models/kclique/n5/mlp_full_e_norm_fw_sm
+mkdir -p experiments/models/kclique/n5/mlp_full_e_kl_sm
 mkdir -p experiments/results/ours/run7/kclique
 mkdir -p logs/slurm
 
-echo "===== Run 7: mlp/full+entropy+norm+fixed_walk(p=0.1218)+small | kclique/n5 ====="
+echo "===== Run 7: mlp/full+entropy+kl+small | kclique/n5 ====="
 echo "Start: $(date)"
 TOTAL_START=$(date +%s)
 
@@ -32,11 +32,10 @@ python scripts/train.py \
     --scale n5 \
     --policy mlp \
     --feature-set full \
-    --hidden-dim 16 \
+    --hidden-dim 32 \
     --n-layers 1 \
-    --entropy-coef 0.1 \
-    --normalize-features \
-    --noise-prob 0.1218 \
+    --entropy-coef 0.01 \
+    --kl-anchor-coef 0.01 \
     --epochs 60 \
     --warmup-epochs 5 \
     --gamma 0.5 \
@@ -53,11 +52,9 @@ python scripts/evaluate.py \
     --family kclique --scale n5 --split val \
     --policies minbreak noveltyplus mlp \
     --feature-set full \
-    --normalize-features \
-    --hidden-dim 16 \
+    --hidden-dim 32 \
     --n-layers 1 \
-    --noise-prob 0.1218 \
-    --model-path experiments/models/kclique/n5/mlp_full_e_norm_fw_sm/best_mlp_full_e_norm_fw_sm.pt \
+    --model-path experiments/models/kclique/n5/mlp_full_e_kl_sm/best_mlp_full_e_kl_sm.pt \
     --max-tries 10 \
     --save-csv experiments/results/ours/run7/kclique/n5_val.csv
 END=$(date +%s)

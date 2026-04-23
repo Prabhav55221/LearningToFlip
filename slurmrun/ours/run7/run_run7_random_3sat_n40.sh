@@ -18,11 +18,11 @@ export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
 set -e
 
-mkdir -p experiments/models/random_3sat/n40/mlp_full_e_norm_fw_sm
+mkdir -p experiments/models/random_3sat/n40/mlp_full_e_kl_sm
 mkdir -p experiments/results/ours/run7/random_3sat
 mkdir -p logs/slurm
 
-echo "===== Run 7: mlp/full+entropy+norm+fixed_walk(p=0.0644)+small | random_3sat/n40 ====="
+echo "===== Run 7: mlp/full+entropy+kl+small | random_3sat/n40 ====="
 echo "Start: $(date)"
 TOTAL_START=$(date +%s)
 
@@ -32,11 +32,10 @@ python scripts/train.py \
     --scale n40 \
     --policy mlp \
     --feature-set full \
-    --hidden-dim 16 \
+    --hidden-dim 32 \
     --n-layers 1 \
-    --entropy-coef 0.1 \
-    --normalize-features \
-    --noise-prob 0.0644 \
+    --entropy-coef 0.01 \
+    --kl-anchor-coef 0.01 \
     --epochs 60 \
     --warmup-epochs 5 \
     --gamma 0.5 \
@@ -53,11 +52,9 @@ python scripts/evaluate.py \
     --family random_3sat --scale n40 --split val \
     --policies minbreak noveltyplus mlp \
     --feature-set full \
-    --normalize-features \
-    --hidden-dim 16 \
+    --hidden-dim 32 \
     --n-layers 1 \
-    --noise-prob 0.0644 \
-    --model-path experiments/models/random_3sat/n40/mlp_full_e_norm_fw_sm/best_mlp_full_e_norm_fw_sm.pt \
+    --model-path experiments/models/random_3sat/n40/mlp_full_e_kl_sm/best_mlp_full_e_kl_sm.pt \
     --max-tries 10 \
     --save-csv experiments/results/ours/run7/random_3sat/n40_val.csv
 END=$(date +%s)

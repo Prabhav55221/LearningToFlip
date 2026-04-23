@@ -61,6 +61,8 @@ def main() -> None:
     parser.add_argument("--save-dir",      type=Path,  default=Path("experiments/models"))
     parser.add_argument("--seed",          type=int,   default=42)
     parser.add_argument("--entropy-coef",  type=float, default=0.0, help="Entropy regularization coefficient (0=disabled).")
+    parser.add_argument("--kl-anchor-coef", type=float, default=0.0,
+                        help="KL penalty to a frozen post-warmup reference policy.")
     parser.add_argument("--verbose",       action="store_true")
     parser.add_argument("--wandb",         action="store_true", help="Enable Weights & Biases logging.")
     args = parser.parse_args()
@@ -84,6 +86,8 @@ def main() -> None:
         run_name += "_norm"
     if args.noise_prob > 0.0:
         run_name += "_fw"
+    if args.kl_anchor_coef > 0.0:
+        run_name += "_kl"
     if args.hidden_dim < 64 or args.n_layers < 2:
         run_name += "_sm"
 
@@ -105,6 +109,7 @@ def main() -> None:
                 "gamma": args.gamma,
                 "lr": args.lr,
                 "entropy_coef": args.entropy_coef,
+                "kl_anchor_coef": args.kl_anchor_coef,
                 "epochs": args.epochs,
                 "warmup_epochs": args.warmup_epochs,
                 "seed": args.seed,
@@ -114,6 +119,7 @@ def main() -> None:
                   *( ["multiscale"] if len(scales) > 1         else []),
                   *( ["normalize"]  if args.normalize_features else []),
                   *( ["fixed_walk"] if args.noise_prob > 0.0   else []),
+                  *( ["kl_anchor"]  if args.kl_anchor_coef > 0 else []),
                   *( ["small_mlp"]  if args.hidden_dim < 64    else [])],
         )
         log_fn = wandb.log
@@ -152,6 +158,7 @@ def main() -> None:
         gamma=args.gamma,
         lr=args.lr,
         entropy_coef=args.entropy_coef,
+        kl_anchor_coef=args.kl_anchor_coef,
         epochs=args.epochs,
         warmup_epochs=args.warmup_epochs,
         max_flips=max_flips,

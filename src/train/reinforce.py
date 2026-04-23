@@ -15,6 +15,7 @@ k-step return for flip at step t (fired when step t+k is observed):
     G_t = Σ_{i=0}^{k-1} γ^i · r_{t+i}
 """
 
+import copy
 import math
 import random
 import logging
@@ -41,6 +42,7 @@ class REINFORCEConfig:
     lr: float = 1e-3
     weight_decay: float = 1e-5
     entropy_coef: float = 0.0
+    kl_anchor_coef: float = 0.0
     normalize_reward: bool = False   # tanh-clip raw make-break reward
     epochs: int = 60
     warmup_epochs: int = 5
@@ -86,9 +88,15 @@ class REINFORCETrainer:
     Call reset() at the start of each new episode.
     """
 
-    def __init__(self, policy: nn.Module, config: REINFORCEConfig) -> None:
+    def __init__(
+        self,
+        policy: nn.Module,
+        config: REINFORCEConfig,
+        reference_policy: nn.Module | None = None,
+    ) -> None:
         self.policy = policy
         self.config = config
+        self.reference_policy = reference_policy
         self.optimizer = torch.optim.AdamW(
             policy.parameters(), lr=config.lr, weight_decay=config.weight_decay
         )
@@ -115,10 +123,18 @@ class REINFORCETrainer:
         # Recompute log-probs with current weights (handles noise-walk mixture if present)
         log_probs = self.policy.log_prob_phi(phi_t)
         lp_t      = log_probs[idx_t]
+        probs     = torch.exp(log_probs)
 
         advantage = G_t - self._baseline   # subtract OLD baseline
         entropy   = -torch.sum(torch.exp(log_probs) * log_probs)
         loss      = -(lp_t * advantage) - self.config.entropy_coef * entropy
+        kl_to_ref = 0.0
+        if self.reference_policy is not None and self.config.kl_anchor_coef > 0.0:
+            with torch.no_grad():
+                ref_log_probs = self.reference_policy.log_prob_phi(phi_t)
+            kl_term   = torch.sum(probs * (log_probs - ref_log_probs))
+            kl_to_ref = float(kl_term.item())
+            loss      = loss + self.config.kl_anchor_coef * kl_term
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -131,6 +147,7 @@ class REINFORCETrainer:
             "return":    G_t,
             "advantage": float(advantage),
             "entropy":   entropy.item(),
+            "kl_to_ref": kl_to_ref,
         }
 
     def _update_baseline(self, G_t: float) -> None:
@@ -239,6 +256,11 @@ def train(
             if log_fn:
                 log_fn({"warmup/mean_loss": warmup_loss}, step=epoch + 1)
 
+    reference_policy: nn.Module | None = None
+    if config.kl_anchor_coef > 0.0:
+        reference_policy = copy.deepcopy(policy)
+        reference_policy.eval()
+
     # ------------------------------------------------------------------ #
     # Initial validation — warm-up model is the checkpoint to beat        #
     # ------------------------------------------------------------------ #
@@ -259,7 +281,7 @@ def train(
     # REINFORCE phase: per-step rolling k-step buffer updates             #
     # ------------------------------------------------------------------ #
     log.info("==> REINFORCE phase (%d epochs)", config.epochs)
-    trainer = REINFORCETrainer(policy, config)
+    trainer = REINFORCETrainer(policy, config, reference_policy=reference_policy)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         trainer.optimizer,
         max_lr=config.lr,
@@ -273,6 +295,7 @@ def train(
         random.shuffle(train_formulas)
         all_losses:     list[float] = []
         all_entropies:  list[float] = []
+        all_kls:        list[float] = []
         all_returns:    list[float] = []
         all_rewards:    list[float] = []
         all_advantages: list[float] = []
@@ -309,6 +332,7 @@ def train(
                 if metrics is not None:
                     all_losses.append(metrics["loss"])
                     all_entropies.append(metrics["entropy"])
+                    all_kls.append(metrics["kl_to_ref"])
                     all_returns.append(metrics["return"])
                     all_advantages.append(metrics["advantage"])
 
@@ -316,6 +340,8 @@ def train(
 
         mean_loss      = float(np.mean(all_losses))     if all_losses     else 0.0
         mean_entropy   = float(np.mean(all_entropies))  if all_entropies  else 0.0
+        mean_kl        = float(np.mean(all_kls))        if all_kls        else 0.0
+        std_kl         = float(np.std(all_kls))         if all_kls        else 0.0
         mean_return    = float(np.mean(all_returns))    if all_returns    else 0.0
         mean_reward    = float(np.mean(all_rewards))    if all_rewards    else 0.0
         std_reward     = float(np.std(all_rewards))     if all_rewards    else 0.0
@@ -331,6 +357,9 @@ def train(
             metrics_dict = {
                 "train/mean_loss":      mean_loss,
                 "train/mean_entropy":   mean_entropy,
+                "train/mean_policy_entropy": mean_entropy,
+                "train/mean_kl_to_ref": mean_kl,
+                "train/std_kl_to_ref":  std_kl,
                 "train/mean_return":    mean_return,
                 "train/mean_reward":    mean_reward,
                 "train/std_reward":     std_reward,
@@ -340,7 +369,7 @@ def train(
                 "train/baseline":       trainer._baseline,
                 "train/lr":             scheduler.get_last_lr()[0],
             }
-            if hasattr(policy, "noise_walk") and policy.noise_walk:
+            if hasattr(policy, "noise_prob") and getattr(policy, "noise_prob", 0.0) > 0.0:
                 metrics_dict["train/noise_prob"] = policy.noise_prob
             log_fn(metrics_dict, step=epoch + 1)
 

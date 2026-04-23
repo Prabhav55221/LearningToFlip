@@ -4,7 +4,7 @@ MLP scoring policy — main contribution.
 score(x) = MLP(φ(x, state))
 
 Hidden dim and depth are configurable; default (64, 2) for full experiments,
-(16, 1) for the generalization-focused run7 (small model, fewer params).
+with smaller variants used for controlled ablations when needed.
 
 noise_prob: fixed random-walk probability matching Interian's escape mechanism.
   - At inference: with prob noise_prob pick a random candidate (by_policy=False)

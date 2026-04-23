@@ -27,7 +27,7 @@ def test_n_true_on_init(all_false_state):
 
 
 def test_unsat_set_on_init(all_false_state):
-    assert all_false_state._unsat == {0}
+    assert all_false_state._unsat_set == {0}
 
 
 def test_n_unsat_on_init(all_false_state):
@@ -110,8 +110,8 @@ def test_flip_x0_updates_n_true(all_false_state):
 def test_flip_x0_updates_unsat_set(all_false_state):
     all_false_state.flip(0)
     # Clause 0 becomes SAT, clause 1 becomes UNSAT
-    assert 0 not in all_false_state._unsat
-    assert 1 in all_false_state._unsat
+    assert 0 not in all_false_state._unsat_set
+    assert 1 in all_false_state._unsat_set
     assert all_false_state.n_unsat == 1
 
 
