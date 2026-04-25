@@ -1,0 +1,2 @@
+policy,median_flips,mean_flips,solve_rate,n_solved,n_instances
+mlp,100.0,150.956,100.0,500,500
