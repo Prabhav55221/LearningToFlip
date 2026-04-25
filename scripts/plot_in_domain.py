@@ -5,6 +5,9 @@ This script evaluates all available in-domain checkpoints on the matching test
 split, saves per-instance raw results, computes paper-friendly summary metrics
 with bootstrap confidence intervals, and generates family-level line plots.
 
+If cached per-instance raw results already exist, they are reused by default
+and no solver calls are rerun unless --force is passed.
+
 Methods:
   - MinBreak
   - Novelty+
@@ -60,10 +63,11 @@ BUDGETS = {
     "n300": 30_000,
 }
 
+# Main-paper in-domain protocol: matched family and size on the structured
+# families we report in the core in-domain table/plots.
 FAMILY_SCALES = {
-    "kcoloring": ["n50", "n75", "n100", "n200", "n300"],
-    "random_3sat": ["n40", "n50", "n60", "n70", "n100", "n200"],
-    "kclique": ["n5", "n10", "n15", "n20"],
+    "kcoloring": ["n50", "n75"],
+    "kclique": ["n5", "n10", "n15"],
     "domset": ["n5", "n7", "n9", "n12"],
 }
 
@@ -92,6 +96,10 @@ class MethodSpec:
 
 def scale_to_int(scale: str) -> int:
     return int(scale[1:])
+
+
+def method_slug(method_label: str) -> str:
+    return method_label.lower().replace("+", "plus").replace("-", "_").replace(" ", "_")
 
 
 def infer_mlp_architecture(model_path: Path) -> tuple[int, int]:
@@ -136,22 +144,26 @@ def load_policy(spec: MethodSpec):
     raise ValueError(f"Unknown method kind: {spec.kind}")
 
 
-def available_methods(family: str, scale: str) -> list[MethodSpec]:
+def has_cached_raw(raw_dir: Path, family: str, scale: str, split: str, method_label: str) -> bool:
+    return (raw_dir / family / f"{scale}_{split}_{method_slug(method_label)}.csv").exists()
+
+
+def available_methods(family: str, scale: str, raw_dir: Path, split: str) -> list[MethodSpec]:
     specs = [
         MethodSpec(label="MinBreak", kind="minbreak"),
         MethodSpec(label="Novelty+", kind="noveltyplus"),
     ]
 
     interian_ckpt = Path("experiments/models") / family / scale / "interian" / "best_interian.pt"
-    if interian_ckpt.exists():
+    if interian_ckpt.exists() or has_cached_raw(raw_dir, family, scale, split, "Interian"):
         specs.append(MethodSpec(label="Interian", kind="interian", checkpoint=interian_ckpt))
 
     run6e_ckpt = Path("experiments/models") / family / scale / "mlp_full_e" / "best_mlp_full_e.pt"
-    if run6e_ckpt.exists():
+    if run6e_ckpt.exists() or has_cached_raw(raw_dir, family, scale, split, "LTF-Naive"):
         specs.append(MethodSpec(label="LTF-Naive", kind="mlp", checkpoint=run6e_ckpt))
 
     run7_ckpt = Path("experiments/models") / family / scale / "mlp_full_e_kl_sm" / "best_mlp_full_e_kl_sm.pt"
-    if run7_ckpt.exists():
+    if run7_ckpt.exists() or has_cached_raw(raw_dir, family, scale, split, "LTF-KL"):
         specs.append(MethodSpec(label="LTF-KL", kind="mlp", checkpoint=run7_ckpt))
 
     # Skip scales that only have classical baselines; the user asked for
@@ -173,8 +185,7 @@ def load_formulas(family: str, scale: str, split: str, max_instances: int | None
 
 
 def raw_csv_path(raw_dir: Path, family: str, scale: str, split: str, method_label: str) -> Path:
-    slug = method_label.lower().replace("+", "plus").replace("-", "_").replace(" ", "_")
-    return raw_dir / family / f"{scale}_{split}_{slug}.csv"
+    return raw_dir / family / f"{scale}_{split}_{method_slug(method_label)}.csv"
 
 
 def evaluate_method(
@@ -200,6 +211,13 @@ def evaluate_method(
                 }
                 for row in csv.DictReader(f)
             ]
+
+    if spec.kind in {"interian", "mlp"} and (spec.checkpoint is None or not spec.checkpoint.exists()):
+        log.warning(
+            "Skipping %s/%s %s: no checkpoint and no cached raw results found",
+            family, scale, spec.label,
+        )
+        return []
 
     formulas = load_formulas(family, scale, split, max_instances)
     if not formulas:
@@ -334,11 +352,11 @@ def plot_family(summary_rows: list[dict], family: str, out_dir: Path) -> None:
         ("mean_time_s", "Mean Time (s)"),
     ]
 
-    fig, axes = plt.subplots(3, 2, figsize=(14, 12))
-    axes_flat = axes.flatten()
+    family_dir = out_dir / family
+    family_dir.mkdir(parents=True, exist_ok=True)
 
-    for ax_idx, (metric, title) in enumerate(metrics):
-        ax = axes_flat[ax_idx]
+    for metric, title in metrics:
+        fig, ax = plt.subplots(figsize=(7.5, 5.2))
         for method, style in METHOD_STYLES.items():
             method_rows = sorted(
                 (row for row in family_rows if row["method"] == method),
@@ -371,21 +389,19 @@ def plot_family(summary_rows: list[dict], family: str, out_dir: Path) -> None:
         ax.grid(True, alpha=0.25)
         if metric == "solve_rate":
             ax.set_ylim(0.0, 102.0)
+        elif metric == "mean_time_s":
+            # Time differences are small on a linear scale; log improves readability.
+            ax.set_yscale("log")
 
-    axes_flat[5].axis("off")
-    handles, labels = axes_flat[0].get_legend_handles_labels()
-    if handles:
-        axes_flat[5].legend(handles, labels, loc="center", frameon=False, ncol=1)
+        ax.legend(frameon=False)
+        fig.suptitle(f"{FAMILY_TITLES.get(family, family)} In-Domain Test Performance", fontsize=14)
+        fig.tight_layout(rect=(0, 0, 1, 0.96))
 
-    fig.suptitle(f"{FAMILY_TITLES.get(family, family)} In-Domain Test Performance", fontsize=16)
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    png_path = out_dir / f"{family}_in_domain_test.png"
-    pdf_path = out_dir / f"{family}_in_domain_test.pdf"
-    fig.savefig(png_path, dpi=220, bbox_inches="tight")
-    fig.savefig(pdf_path, bbox_inches="tight")
-    plt.close(fig)
+        png_path = family_dir / f"{metric}.png"
+        pdf_path = family_dir / f"{metric}.pdf"
+        fig.savefig(png_path, dpi=220, bbox_inches="tight")
+        fig.savefig(pdf_path, bbox_inches="tight")
+        plt.close(fig)
 
 
 def main() -> None:
@@ -393,7 +409,12 @@ def main() -> None:
         description="Evaluate and plot in-domain test performance.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--families", nargs="+", choices=list(FAMILY_SCALES.keys()), default=list(FAMILY_SCALES.keys()))
+    parser.add_argument(
+        "--families",
+        nargs="+",
+        choices=list(FAMILY_SCALES.keys()),
+        default=["kcoloring", "kclique", "domset"],
+    )
     parser.add_argument("--split", choices=["val", "test"], default="test")
     parser.add_argument("--max-tries", type=int, default=10)
     parser.add_argument("--max-instances", type=int, default=None)
@@ -415,7 +436,7 @@ def main() -> None:
 
     for family in args.families:
         for scale in FAMILY_SCALES[family]:
-            methods = available_methods(family, scale)
+            methods = available_methods(family, scale, args.raw_dir, args.split)
             if not methods:
                 log.info("Skipping %s/%s: no learned checkpoints available", family, scale)
                 continue
