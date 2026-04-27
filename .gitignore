@@ -24,3 +24,12 @@ logs/*
 wandb
 
 PAPER
+
+experiments/generalization
+experiments/models
+experiments/plots
+experiments/results
+
+PDFs
+
+tests

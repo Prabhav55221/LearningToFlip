@@ -1,8 +1,7 @@
 """
 Generalization evaluation for one learned checkpoint across the family scales.
 
-The workflow assumes a single base checkpoint at a time, currently run6e by
-default, and compares:
+The workflow assumes a single base checkpoint at a time and compares:
   - classical baselines
   - optional Interian checkpoint
   - frozen learned policy
