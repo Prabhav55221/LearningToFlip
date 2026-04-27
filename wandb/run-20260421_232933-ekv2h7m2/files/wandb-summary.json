@@ -1,1 +1,0 @@
-{"_wandb":{"runtime":4234},"train/mean_entropy":0.02729371820022236,"_step":60,"warmup/mean_loss":0.6373557334339957,"train/n_updates":111985,"train/mean_loss":0.07390635245300506,"train/baseline":1.0565329037927584,"_runtime":4234.495895141,"_timestamp":1.776832810031223e+09,"val/median_flips":55.5,"train/lr":2.1370139381221737e-05,"train/epoch":60}

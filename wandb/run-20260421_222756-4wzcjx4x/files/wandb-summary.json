@@ -1,1 +1,0 @@
-{"train/n_updates":16657,"_wandb":{"runtime":16063},"val/median_flips":18,"train/epoch":60,"train/mean_loss":-0.1915350756169899,"train/baseline":8.090274434049729,"train/lr":2.1370139381221737e-05,"_step":60,"_runtime":16063.979605526,"warmup/mean_loss":0.582067009696835,"_timestamp":1.7768409422741892e+09}

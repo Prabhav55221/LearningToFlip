@@ -1,1 +1,0 @@
-{"_runtime":15459.912529778,"train/noise_prob":6.107561034696118e-08,"train/lr":2.1370139381221737e-05,"val/median_flips":96.5,"train/mean_loss":0.0007462042222821046,"train/epoch":60,"_wandb":{"runtime":15459},"_timestamp":1.776840389168253e+09,"warmup/mean_loss":0.7621525517419765,"_step":60,"train/solved_rate":0.9994736842105263}
